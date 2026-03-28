@@ -1,12 +1,11 @@
 import os
 import logging
 import secrets
-import httpx
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
+from from groq import Groq
 from dotenv import load_dotenv
-from groq import Groq
 
 load_dotenv()
 
@@ -19,28 +18,28 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # FastAPI Init
 # -----------------------------
-app = FastAPI(title="Signaturesi Neo L1.0 API")
+app = FastAPI(title="Signaturesi Neo L1.0 API (Groq Browser)")
 
 # -----------------------------
 # CORS Middleware
 # -----------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # production me restrict karna
+    allow_origins=["*"],  # Strict: replace with your frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # -----------------------------
-# ENV VARIABLES
+# Environment Variables
 # -----------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # -----------------------------
-# CLIENTS INIT
+# Clients Init
 # -----------------------------
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -48,138 +47,110 @@ try:
     logger.info("Connected to Supabase and Groq successfully.")
 except Exception as e:
     logger.error(f"Initialization Error: {e}")
-    raise RuntimeError("Cannot connect to services")
+    raise RuntimeError("Cannot connect to Supabase or Groq")
 
 # -----------------------------
-# SYSTEM PROMPT
+# System Prompt
 # -----------------------------
-SYSTEM_PROMPT = """
-You are Neo L1.0, an advanced reasoning AI by Signaturesi.
-You have access to web search. If needed, fetch latest info.
-"""
+SYSTEM_PROMPT = "You are Neo L1.0, an advanced reasoning AI by Signaturesi."
 
 # -----------------------------
-# SIMPLE WEB SEARCH FUNCTION
-# -----------------------------
-async def web_search(query: str):
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.get(
-                "https://duckduckgo.com/?q=" + query + "&format=json"
-            )
-            return res.text[:2000]  # limit
-    except:
-        return "Web search failed"
-
-# -----------------------------
-# HEALTH
+# Health Check
 # -----------------------------
 @app.get("/")
 def home():
     return {"status": "Online", "brand": "Signaturesi", "model": "Neo L1.0"}
 
 # -----------------------------
-# BALANCE
+# Get User Balance
 # -----------------------------
 @app.get("/v1/user/balance")
 def get_balance(api_key: str):
-    response = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
-
-    if not response.data:
-        raise HTTPException(status_code=404, detail="API Key not found")
-
-    return {
-        "api_key": api_key,
-        "balance": response.data[0]["token_balance"]
-    }
+    try:
+        response = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="API Key not found")
+        balance = response.data[0].get("token_balance", 0)
+        return {"api_key": api_key, "balance": balance}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supabase Error: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
 
 # -----------------------------
-# NEW KEY
+# Generate New API Key
 # -----------------------------
 @app.post("/v1/user/new-key")
 async def generate_key(request: Request):
     new_key = "sig-live-" + secrets.token_urlsafe(16)
-
+    user_country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
     try:
         supabase.table("users").insert({
             "api_key": new_key,
             "token_balance": 1000,
-            "country": "Unknown"
+            "country": user_country
         }).execute()
-
-        return {"api_key": new_key, "balance": 1000}
-
+        return {"api_key": new_key, "balance": 1000, "country": user_country}
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail="Key creation failed")
+        logger.error(f"Supabase Insert Error: {e}")
+        raise HTTPException(status_code=500, detail="Cannot create new API key")
 
 # -----------------------------
-# CHAT
+# Chat Endpoint with Groq + Browser
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
-
-    # 🔐 AUTH
+    # 1️⃣ Validate API Key
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing API Key")
-
     user_api_key = authorization.replace("Bearer ", "")
 
+    # 2️⃣ Parse JSON & Validate Model
     body = await request.json()
     model_name = body.get("model")
-
     if model_name != "Neo-L1.0":
-        raise HTTPException(status_code=400, detail="Use Neo-L1.0")
+        raise HTTPException(status_code=400, detail="Invalid model. Please use 'Neo-L1.0'")
 
-    messages = body.get("messages")
+    user_messages = body.get("messages")
+    if not user_messages or not isinstance(user_messages, list):
+        raise HTTPException(status_code=400, detail="Missing or invalid 'messages' array")
 
-    # 💰 CHECK BALANCE
-    db = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
-
-    if not db.data:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
-
-    balance = db.data[0]["token_balance"]
-
-    if balance <= 0:
-        raise HTTPException(status_code=402, detail="No balance")
-
-    # 🌐 OPTIONAL WEB SEARCH
-    last_user_msg = messages[-1]["content"]
-
-    if "search:" in last_user_msg.lower():
-        query = last_user_msg.replace("search:", "")
-        web_data = await web_search(query)
-
-        messages.append({
-            "role": "system",
-            "content": f"Web result:\n{web_data}"
-        })
-
-    # 🤖 GROQ CALL
+    # 3️⃣ Check User Balance
     try:
-        response = groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
-            temperature=0.4
+        response = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=401, detail="Invalid API Key")
+        current_balance = response.data[0].get("token_balance", 0)
+    except Exception as e:
+        logger.error(f"Supabase Error: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
+
+    if current_balance <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient Balance")
+
+    # 4️⃣ Call Groq AI with Browser Tool
+    try:
+        completion = groq_client.chat.completions.create(
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + user_messages,
+            model="openai/gpt-oss-20b",
+            temperature=1,
+            max_completion_tokens=8192,
+            top_p=1,
+            reasoning_effort="medium",
+            stream=False,
+            tools=[{"type": "browser_search"}]  # ✅ Browser tool enabled
         )
 
-        # 📉 TOKEN USAGE (approx)
-        tokens_used = len(str(response)) // 4
-        new_balance = max(0, balance - tokens_used)
+        # 5️⃣ Deduct Tokens
+        tokens_used = getattr(completion.usage, "total_tokens", 0)
+        new_balance = max(0, current_balance - tokens_used)
+        supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-        supabase.table("users").update({
-            "token_balance": new_balance
-        }).eq("api_key", user_api_key).execute()
-
-        # 🧠 CUSTOM RESPONSE FORMAT
-        return {
-            "id": response.id,
-            "object": "chat.completion",
-            "model": "Neo-L1.0",
-            "choices": response.choices
-        }
+        # 6️⃣ Customize Model in Response
+        completion.model = "Neo-L1.0"
+        return completion
 
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail="AI failed")
+        logger.error(f"Groq AI Error: {e}")
+        raise HTTPException(status_code=500, detail="AI Engine Failed")
