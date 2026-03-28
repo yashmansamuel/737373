@@ -4,9 +4,9 @@ import secrets
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
-from groq import Groq
 from dotenv import load_dotenv
-import traceback
+from groq import Groq
+import asyncio
 
 load_dotenv()
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # FastAPI Init
 # -----------------------------
-app = FastAPI(title="Signaturesi Neo L1.0 API (Groq Browser)")
+app = FastAPI(title="Signaturesi Neo L1.0 API")
 
 # -----------------------------
 # CORS Middleware
@@ -37,14 +37,13 @@ app.add_middleware(
 # -----------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # -----------------------------
 # Clients Init
 # -----------------------------
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    groq_client = Groq(api_key=GROQ_API_KEY)
+    groq_client = Groq()
     logger.info("Connected to Supabase and Groq successfully.")
 except Exception as e:
     logger.error(f"Initialization Error: {e}")
@@ -53,7 +52,7 @@ except Exception as e:
 # -----------------------------
 # System Prompt
 # -----------------------------
-SYSTEM_PROMPT = "You are Neo L1.0, an advanced reasoning AI by Signaturesi."
+SYSTEM_PROMPT = "You are Neo L1.0, an advanced reasoning AI by Signaturesi with web browsing capabilities."
 
 # -----------------------------
 # Health Check
@@ -86,6 +85,7 @@ def get_balance(api_key: str):
 async def generate_key(request: Request):
     new_key = "sig-live-" + secrets.token_urlsafe(16)
     user_country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
+
     try:
         supabase.table("users").insert({
             "api_key": new_key,
@@ -94,11 +94,11 @@ async def generate_key(request: Request):
         }).execute()
         return {"api_key": new_key, "balance": 1000, "country": user_country}
     except Exception as e:
-        logger.error(f"Supabase Insert Error: {traceback.format_exc()}")
+        logger.error(f"Supabase Insert Error: {e}")
         raise HTTPException(status_code=500, detail="Cannot create new API key")
 
 # -----------------------------
-# Chat Endpoint (Groq + Browser Tool)
+# Chat Endpoint with Groq + Browser Search
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
@@ -111,8 +111,7 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     body = await request.json()
     model_name = body.get("model")
     if model_name != "Neo-L1.0":
-        raise HTTPException(status_code=400, detail="Invalid model. Please use 'Neo-L1.0'")
-
+        raise HTTPException(status_code=400, detail="Invalid model. Use 'Neo-L1.0'")
     user_messages = body.get("messages")
     if not user_messages or not isinstance(user_messages, list):
         raise HTTPException(status_code=400, detail="Missing or invalid 'messages' array")
@@ -124,39 +123,38 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid API Key")
         current_balance = response.data[0].get("token_balance", 0)
     except Exception as e:
-        logger.error(f"Supabase Error: {traceback.format_exc()}")
+        logger.error(f"Supabase Error: {e}")
         raise HTTPException(status_code=500, detail="Database error")
-
     if current_balance <= 0:
         raise HTTPException(status_code=402, detail="Insufficient Balance")
 
-    # 4️⃣ Call Groq AI (stream=False for cURL / non-async testing)
-    try:
-        completion = groq_client.chat.completions.create(
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + user_messages,
-            model="openai/gpt-oss-20b",
-            temperature=1,
-            max_completion_tokens=8192,
-            top_p=1,
-            reasoning_effort="medium",
-            stream=False,  # ⚠️ important for cURL testing
-            tools=[{"type": "browser_search"}]
-        )
+    # 4️⃣ Call Groq AI (with safe retry)
+    async def run_groq():
+        for attempt in range(3):
+            try:
+                completion = groq_client.chat.completions.create(
+                    messages=[{"role": "system", "content": SYSTEM_PROMPT}] + user_messages,
+                    model="openai/gpt-oss-20b",
+                    temperature=0.7,
+                    max_completion_tokens=2048,
+                    top_p=1,
+                    reasoning_effort="medium",
+                    stream=False,
+                    tools=[{"type": "browser_search"}]
+                )
+                return completion
+            except Exception as e:
+                logger.warning(f"Groq attempt {attempt+1} failed: {e}")
+                await asyncio.sleep(1)  # wait before retry
+        raise HTTPException(status_code=500, detail="AI Engine Failed after 3 attempts")
 
-        ai_content = completion.choices[0].message.content
+    ai_response = await run_groq()
 
-        # 5️⃣ Deduct Tokens (if usage info available)
-        tokens_used = getattr(completion.usage, "total_tokens", 0)
-        new_balance = max(0, current_balance - tokens_used)
-        supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
+    # 5️⃣ Deduct tokens (estimate if usage not provided)
+    tokens_used = getattr(ai_response.usage, "total_tokens", 1000)
+    new_balance = max(0, current_balance - tokens_used)
+    supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-        return {
-            "content": ai_content,
-            "model": "Neo-L1.0",
-            "tokens_used": tokens_used,
-            "new_balance": new_balance
-        }
-
-    except Exception as e:
-        logger.error(f"Groq AI Error: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail="AI Engine Failed")
+    # 6️⃣ Customize Response
+    ai_response.model = "Neo-L1.0"
+    return ai_response
