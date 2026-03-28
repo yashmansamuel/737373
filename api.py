@@ -4,7 +4,7 @@ import secrets
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
-from from groq import Groq
+from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # FastAPI Init
 # -----------------------------
-app = FastAPI(title="Signaturesi Neo L1.0 API (Groq Browser)")
+app = FastAPI(title="Signaturesi Neo L1.0 API (Groq Browser Streaming)")
 
 # -----------------------------
 # CORS Middleware
@@ -97,7 +97,7 @@ async def generate_key(request: Request):
         raise HTTPException(status_code=500, detail="Cannot create new API key")
 
 # -----------------------------
-# Chat Endpoint with Groq + Browser
+# Chat Endpoint with Groq + Browser Streaming
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
@@ -129,7 +129,7 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     if current_balance <= 0:
         raise HTTPException(status_code=402, detail="Insufficient Balance")
 
-    # 4️⃣ Call Groq AI with Browser Tool
+    # 4️⃣ Call Groq AI with Browser Tool (Streaming)
     try:
         completion = groq_client.chat.completions.create(
             messages=[{"role": "system", "content": SYSTEM_PROMPT}] + user_messages,
@@ -138,18 +138,23 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
             max_completion_tokens=8192,
             top_p=1,
             reasoning_effort="medium",
-            stream=False,
-            tools=[{"type": "browser_search"}]  # ✅ Browser tool enabled
+            stream=True,
+            tools=[{"type": "browser_search"}]
         )
 
-        # 5️⃣ Deduct Tokens
+        # 5️⃣ Stream output
+        full_content = ""
+        for chunk in completion:
+            text = chunk.choices[0].delta.content or ""
+            print(text, end="")  # logs in server console
+            full_content += text
+
+        # 6️⃣ Deduct Tokens
         tokens_used = getattr(completion.usage, "total_tokens", 0)
         new_balance = max(0, current_balance - tokens_used)
         supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-        # 6️⃣ Customize Model in Response
-        completion.model = "Neo-L1.0"
-        return completion
+        return {"content": full_content, "model": "Neo-L1.0", "tokens_used": tokens_used, "new_balance": new_balance}
 
     except Exception as e:
         logger.error(f"Groq AI Error: {e}")
