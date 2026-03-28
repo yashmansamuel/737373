@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from groq import Groq
 from dotenv import load_dotenv
+import traceback
 
 load_dotenv()
 
@@ -18,14 +19,14 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # FastAPI Init
 # -----------------------------
-app = FastAPI(title="Signaturesi Neo L1.0 API (Groq Browser Streaming)")
+app = FastAPI(title="Signaturesi Neo L1.0 API (Groq Browser)")
 
 # -----------------------------
 # CORS Middleware
 # -----------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Strict: replace with your frontend
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,11 +94,11 @@ async def generate_key(request: Request):
         }).execute()
         return {"api_key": new_key, "balance": 1000, "country": user_country}
     except Exception as e:
-        logger.error(f"Supabase Insert Error: {e}")
+        logger.error(f"Supabase Insert Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Cannot create new API key")
 
 # -----------------------------
-# Chat Endpoint with Groq + Browser Streaming
+# Chat Endpoint (Groq + Browser Tool)
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
@@ -123,13 +124,13 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid API Key")
         current_balance = response.data[0].get("token_balance", 0)
     except Exception as e:
-        logger.error(f"Supabase Error: {e}")
+        logger.error(f"Supabase Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Database error")
 
     if current_balance <= 0:
         raise HTTPException(status_code=402, detail="Insufficient Balance")
 
-    # 4️⃣ Call Groq AI with Browser Tool (Streaming)
+    # 4️⃣ Call Groq AI (stream=False for cURL / non-async testing)
     try:
         completion = groq_client.chat.completions.create(
             messages=[{"role": "system", "content": SYSTEM_PROMPT}] + user_messages,
@@ -138,24 +139,24 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
             max_completion_tokens=8192,
             top_p=1,
             reasoning_effort="medium",
-            stream=True,
+            stream=False,  # ⚠️ important for cURL testing
             tools=[{"type": "browser_search"}]
         )
 
-        # 5️⃣ Stream output
-        full_content = ""
-        for chunk in completion:
-            text = chunk.choices[0].delta.content or ""
-            print(text, end="")  # logs in server console
-            full_content += text
+        ai_content = completion.choices[0].message.content
 
-        # 6️⃣ Deduct Tokens
+        # 5️⃣ Deduct Tokens (if usage info available)
         tokens_used = getattr(completion.usage, "total_tokens", 0)
         new_balance = max(0, current_balance - tokens_used)
         supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-        return {"content": full_content, "model": "Neo-L1.0", "tokens_used": tokens_used, "new_balance": new_balance}
+        return {
+            "content": ai_content,
+            "model": "Neo-L1.0",
+            "tokens_used": tokens_used,
+            "new_balance": new_balance
+        }
 
     except Exception as e:
-        logger.error(f"Groq AI Error: {e}")
+        logger.error(f"Groq AI Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="AI Engine Failed")
