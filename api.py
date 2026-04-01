@@ -116,15 +116,14 @@ async def call_groq_with_fallback(messages):
     for model in GROQ_MODELS:
         for attempt in range(per_model_retries):
             try:
+                # Removed tools and reasoning_effort parameters
                 completion = groq_client.chat.completions.create(
                     messages=messages,
                     model=model,
                     temperature=0.7,
                     max_completion_tokens=2048,
                     top_p=1,
-                    reasoning_effort="medium",
                     stream=False,
-                    tools=[{"type": "browser_search"}]
                 )
                 logger.info(f"Success with model {model} on attempt {attempt+1}")
                 return completion  # success: return immediately
@@ -140,7 +139,7 @@ async def call_groq_with_fallback(messages):
     raise HTTPException(status_code=500, detail="All Groq models failed after retries")
 
 # -----------------------------
-# Chat Endpoint with Groq + Browser Search + Auto Model Switching
+# Chat Endpoint with Groq + Auto Model Switching
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
