@@ -50,9 +50,9 @@ except Exception as e:
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
 # -----------------------------
-# System Prompt
+# System Prompt (Updated)
 # -----------------------------
-SYSTEM_PROMPT = "You are Neo L1.0, an advanced reasoning AI by Signaturesi with web browsing capabilities."
+SYSTEM_PROMPT = "Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens."
 
 # -----------------------------
 # Health Check
