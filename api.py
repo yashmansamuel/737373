@@ -55,6 +55,15 @@ except Exception as e:
 SYSTEM_PROMPT = "Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens."
 
 # -----------------------------
+# Models for automatic fallback (order matters)
+# -----------------------------
+GROQ_MODELS = [
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-safeguard-20b",
+    # Add more models if needed
+]
+
+# -----------------------------
 # Health Check
 # -----------------------------
 @app.get("/")
@@ -98,7 +107,40 @@ async def generate_key(request: Request):
         raise HTTPException(status_code=500, detail="Cannot create new API key")
 
 # -----------------------------
-# Chat Endpoint with Groq + Browser Search
+# Groq call with automatic model switching
+# -----------------------------
+async def call_groq_with_fallback(messages):
+    """Try each model in GROQ_MODELS, with per‑model retries."""
+    per_model_retries = 2  # number of attempts per model before switching
+
+    for model in GROQ_MODELS:
+        for attempt in range(per_model_retries):
+            try:
+                completion = groq_client.chat.completions.create(
+                    messages=messages,
+                    model=model,
+                    temperature=0.7,
+                    max_completion_tokens=2048,
+                    top_p=1,
+                    reasoning_effort="medium",
+                    stream=False,
+                    tools=[{"type": "browser_search"}]
+                )
+                logger.info(f"Success with model {model} on attempt {attempt+1}")
+                return completion  # success: return immediately
+            except Exception as e:
+                logger.warning(f"Model {model}, attempt {attempt+1} failed: {e}")
+                # Wait a bit before retrying the same model
+                await asyncio.sleep(1)
+
+        # After exhausting retries for this model, log and move to next
+        logger.warning(f"Model {model} failed after {per_model_retries} attempts, switching to next model.")
+
+    # If we get here, all models failed
+    raise HTTPException(status_code=500, detail="All Groq models failed after retries")
+
+# -----------------------------
+# Chat Endpoint with Groq + Browser Search + Auto Model Switching
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
@@ -128,27 +170,9 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     if current_balance <= 0:
         raise HTTPException(status_code=402, detail="Insufficient Balance")
 
-    # 4️⃣ Call Groq AI (with safe retry)
-    async def run_groq():
-        for attempt in range(3):
-            try:
-                completion = groq_client.chat.completions.create(
-                    messages=[{"role": "system", "content": SYSTEM_PROMPT}] + user_messages,
-                    model="openai/gpt-oss-20b",
-                    temperature=0.7,
-                    max_completion_tokens=2048,
-                    top_p=1,
-                    reasoning_effort="medium",
-                    stream=False,
-                    tools=[{"type": "browser_search"}]
-                )
-                return completion
-            except Exception as e:
-                logger.warning(f"Groq attempt {attempt+1} failed: {e}")
-                await asyncio.sleep(1)  # wait before retry
-        raise HTTPException(status_code=500, detail="AI Engine Failed after 3 attempts")
-
-    ai_response = await run_groq()
+    # 4️⃣ Call Groq with fallback models
+    messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
+    ai_response = await call_groq_with_fallback(messages_for_groq)
 
     # 5️⃣ Deduct tokens (estimate if usage not provided)
     tokens_used = getattr(ai_response.usage, "total_tokens", 1000)
