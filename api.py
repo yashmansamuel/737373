@@ -50,17 +50,17 @@ except Exception as e:
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
 # -----------------------------
-# System Prompt (Updated)
+# System Prompt (Shortened)
 # -----------------------------
-SYSTEM_PROMPT = "Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens."
+SYSTEM_PROMPT = "Concise reply in 1-2 short sentences. Max 30 tokens."
 
 # -----------------------------
 # Models for automatic fallback (order matters)
 # -----------------------------
 GROQ_MODELS = [
-    "openai/gpt-oss-20b",
-    "openai/gpt-oss-safeguard-20b",
-    # Add more models if needed
+    "llama3-8b-8192",           # efficient, lower token usage
+    "mixtral-8x7b-32768",
+    "openai/gpt-oss-20b",       # fallback
 ]
 
 # -----------------------------
@@ -111,31 +111,27 @@ async def generate_key(request: Request):
 # -----------------------------
 async def call_groq_with_fallback(messages):
     """Try each model in GROQ_MODELS, with per‑model retries."""
-    per_model_retries = 2  # number of attempts per model before switching
+    per_model_retries = 2
 
     for model in GROQ_MODELS:
         for attempt in range(per_model_retries):
             try:
-                # Removed tools and reasoning_effort parameters
                 completion = groq_client.chat.completions.create(
                     messages=messages,
                     model=model,
                     temperature=0.7,
-                    max_completion_tokens=2048,
+                    max_completion_tokens=100,   # Reduced from 2048
                     top_p=1,
                     stream=False,
                 )
                 logger.info(f"Success with model {model} on attempt {attempt+1}")
-                return completion  # success: return immediately
+                return completion
             except Exception as e:
                 logger.warning(f"Model {model}, attempt {attempt+1} failed: {e}")
-                # Wait a bit before retrying the same model
                 await asyncio.sleep(1)
 
-        # After exhausting retries for this model, log and move to next
         logger.warning(f"Model {model} failed after {per_model_retries} attempts, switching to next model.")
 
-    # If we get here, all models failed
     raise HTTPException(status_code=500, detail="All Groq models failed after retries")
 
 # -----------------------------
@@ -173,8 +169,8 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
     ai_response = await call_groq_with_fallback(messages_for_groq)
 
-    # 5️⃣ Deduct tokens (estimate if usage not provided)
-    tokens_used = getattr(ai_response.usage, "total_tokens", 1000)
+    # 5️⃣ Deduct tokens (only completion tokens, not input)
+    tokens_used = getattr(ai_response.usage, "completion_tokens", 50)
     new_balance = max(0, current_balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
