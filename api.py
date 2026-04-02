@@ -11,110 +11,107 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
 
+# Setup
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Signaturesi Neo L1.0 API")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Clients
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
 try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    groq_client = Groq()
+    supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 except Exception as e:
-    logger.error(f"Init Error: {e}")
-    raise RuntimeError("Infra failure")
+    logger.error(f"Initialization Error: {e}")
 
-# Optimized System Prompt for Token Saving
+# Configuration
 SYSTEM_PROMPT = (
     "Mode: Concise Thinker. Logic: Essential only. "
-    "Reasoning: Be brief, avoid repetition. "
-    "Output: Max 2-3 sentences or short bullets. No filler. "
+    "Reasoning: Be brief, no repetition. Output: Max 3 short bullets or 2 sentences. "
     "Knowledge cutoff: July 2025."
 )
 
+# Models ordered by reliability for better switching
 GROQ_MODELS = [
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
+    "llama-3.3-70b-versatile", 
     "llama-3.1-8b-instant",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b"
 ]
 
-def extract_answer_from_reasoning(reasoning: str) -> str:
+def extract_answer(reasoning: str) -> str:
     if not reasoning: return ""
-    patterns = [
-        r"(?:So|Therefore|Thus),?\s*(?:we )?answer:?\s*(.+?)(?:\n\n|$)",
-        r"Final (?:answer|output):?\s*(.+?)(?:\n\n|$)",
-        r"Output:?\s*(.+?)(?:\n\n|$)",
-    ]
-    for pat in patterns:
-        m = re.search(pat, reasoning, re.IGNORECASE | re.DOTALL)
-        if m: return m.group(1).strip()
-    return reasoning.split('\n')[-1] if len(reasoning.split('\n')[-1]) > 10 else reasoning[:200]
+    lines = [l.strip() for l in reasoning.split('\n') if l.strip()]
+    return lines[-1] if len(lines[-1]) > 10 else reasoning[:200]
 
-async def call_groq_with_fallback(messages: List[Dict[str, str]]):
+async def call_groq_silent_fallback(messages: List[Dict[str, str]]):
+    """Bina user ko bataye models switch karne ka logic"""
     for model in GROQ_MODELS:
-        try:
-            completion = groq_client.chat.completions.create(
-                messages=messages,
-                model=model,
-                temperature=0.6,
-                max_completion_tokens=1024, # Cap tokens to save cost
-                reasoning_effort="low",      # CONTROL: Low effort = less tokens
-                stream=False
-            )
-            return completion, model
-        except Exception as e:
-            logger.warning(f"Model {model} failed: {e}")
-            continue
-    raise HTTPException(500, "AI engines exhausted")
-
-@app.get("/v1/user/balance")
-def get_balance(api_key: str):
-    resp = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
-    if not resp.data: raise HTTPException(404, "Invalid Key")
-    return {"balance": resp.data[0]["token_balance"]}
+        for attempt in range(2): # Har model ko 2 baar try karein
+            try:
+                logger.info(f"Attempting {model}...")
+                completion = groq_client.chat.completions.create(
+                    messages=messages,
+                    model=model,
+                    temperature=0.6,
+                    max_completion_tokens=1024,
+                    reasoning_effort="low", # Token saving
+                    stream=False
+                )
+                return completion, model
+            except Exception as e:
+                logger.warning(f"{model} failed. Retrying/Switching... Error: {e}")
+                await asyncio.sleep(0.5)
+                continue
+    return None, None
 
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
     if not authorization: raise HTTPException(401)
-    user_api_key = authorization.split(" ")[1]
+    api_key = authorization.split(" ")[1]
     body = await request.json()
-    
-    # Balance check
-    resp = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
-    if not resp.data or resp.data[0]["token_balance"] <= 0:
-        raise HTTPException(402, "No balance")
 
-    # AI Call
+    # 1. Balance Check
+    user = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
+    if not user.data or user.data[0]["token_balance"] <= 0:
+        raise HTTPException(402, "Insufficient Balance")
+
+    # 2. AI Call with Silent Fallback
     payload = [{"role": "system", "content": SYSTEM_PROMPT}] + body.get("messages", [])
-    ai_res, used_model = await call_groq_with_fallback(payload)
+    ai_res, used_model = await call_groq_silent_fallback(payload)
 
-    msg_obj = ai_res.choices[0].message
-    raw_content = msg_obj.content or ""
-    raw_reasoning = getattr(msg_obj, 'reasoning', "")
+    if not ai_res:
+        raise HTTPException(503, "All engines busy. Please try again.")
 
-    if not raw_content.strip() and raw_reasoning:
-        raw_content = extract_answer_from_reasoning(raw_reasoning)
+    # 3. Data Extraction
+    msg = ai_res.choices[0].message
+    content = msg.content or ""
+    reasoning = getattr(msg, 'reasoning', "")
 
-    # Token update
+    if not content.strip() and reasoning:
+        content = extract_answer(reasoning)
+
+    # 4. Token Accounting
     tokens_used = ai_res.usage.completion_tokens
-    new_bal = max(0, resp.data[0]["token_balance"] - tokens_used)
-    supabase.table("users").update({"token_balance": new_bal}).eq("api_key", user_api_key).execute()
+    new_bal = max(0, user.data[0]["token_balance"] - tokens_used)
+    supabase.table("users").update({"token_balance": new_bal}).eq("api_key", api_key).execute()
 
     return {
-        "message": raw_content.strip(),
-        "reasoning": raw_reasoning.strip(),
+        "message": content.strip(),
+        "reasoning": reasoning.strip(),
         "usage": {"completion_tokens": tokens_used},
         "model": used_model
     }
+
+@app.get("/v1/user/balance")
+async def balance(api_key: str):
+    res = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
+    return {"balance": res.data[0]["token_balance"] if res.data else 0}
