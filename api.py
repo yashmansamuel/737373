@@ -50,16 +50,16 @@ except Exception as e:
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
 # -----------------------------
-# System Prompt (Original)
+# System Prompt (Original - as requested)
 # -----------------------------
 SYSTEM_PROMPT = "Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens."
 
 # -----------------------------
-# Models for automatic fallback (only available models)
+# Only these two models, in order (primary then fallback)
 # -----------------------------
 GROQ_MODELS = [
-    "openai/gpt-oss-20b",           # primary
-    "openai/gpt-oss-safeguard-20b", # fallback
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-safeguard-20b",
 ]
 
 # -----------------------------
@@ -106,7 +106,7 @@ async def generate_key(request: Request):
         raise HTTPException(status_code=500, detail="Cannot create new API key")
 
 # -----------------------------
-# Groq call with automatic model switching
+# Groq call with automatic fallback (only the two models)
 # -----------------------------
 async def call_groq_with_fallback(messages):
     """Try each model in GROQ_MODELS, with per‑model retries."""
@@ -115,15 +115,19 @@ async def call_groq_with_fallback(messages):
     for model in GROQ_MODELS:
         for attempt in range(per_model_retries):
             try:
+                # Note: reasoning_effort is not officially supported by Groq for these models,
+                # so we omit it. To minimize token usage, we set max_completion_tokens=80
+                # (slightly above system prompt's 60 to allow completion without truncation)
                 completion = groq_client.chat.completions.create(
                     messages=messages,
                     model=model,
                     temperature=0.7,
-                    max_completion_tokens=100,   # limit output to reduce token usage
+                    max_completion_tokens=80,   # Enough for reply + small reasoning overhead
                     top_p=1,
                     stream=False,
                 )
                 logger.info(f"Success with model {model} on attempt {attempt+1}")
+                # Log token usage for debugging
                 if hasattr(completion, 'usage'):
                     logger.info(f"Token usage: prompt={completion.usage.prompt_tokens}, completion={completion.usage.completion_tokens}, total={completion.usage.total_tokens}")
                 return completion
@@ -133,11 +137,10 @@ async def call_groq_with_fallback(messages):
 
         logger.warning(f"Model {model} failed after {per_model_retries} attempts, switching to next model.")
 
-    # If we get here, all models failed
     raise HTTPException(status_code=500, detail="All Groq models failed after retries")
 
 # -----------------------------
-# Chat Endpoint with Groq + Auto Model Switching
+# Chat Endpoint – uses only the two models, deducts only completion tokens
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
@@ -167,16 +170,23 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     if current_balance <= 0:
         raise HTTPException(status_code=402, detail="Insufficient Balance")
 
-    # 4️⃣ Call Groq with fallback models
+    # 4️⃣ Call Groq with fallback (only the two models)
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
     ai_response = await call_groq_with_fallback(messages_for_groq)
 
-    # 5️⃣ Deduct tokens (only completion tokens, not input)
+    # 5️⃣ Deduct ONLY completion tokens (output tokens) – not input
     tokens_used = getattr(ai_response.usage, "completion_tokens", 50)
     new_balance = max(0, current_balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
     logger.info(f"User {user_api_key} used {tokens_used} completion tokens. New balance: {new_balance}")
 
-    # 6️⃣ Customize Response
-    ai_response.model = "Neo-L1.0"
-    return ai_response
+    # 6️⃣ Return simplified response (makes frontend easier)
+    assistant_content = ai_response.choices[0].message.content
+    return {
+        "message": assistant_content,
+        "usage": {
+            "completion_tokens": tokens_used,
+            "total_tokens": ai_response.usage.total_tokens
+        },
+        "model": "Neo-L1.0"
+    }
