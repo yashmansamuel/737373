@@ -3,6 +3,7 @@ import logging
 import secrets
 import re
 import asyncio
+import time
 from typing import List, Tuple
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,12 +16,12 @@ from groq import Groq
 load_dotenv()
 
 # -----------------------------
-# 1. Logger & App Setup
+# 1. Logging & App Setup
 # -----------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Neo-Surgical-v2")
 
-app = FastAPI(title="Signaturesi Neo L1.0")
+app = FastAPI(title="Signaturesi Neo L1.0 - Token Saver Edition")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,116 +37,119 @@ SUPABASE: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_
 GROQ_CLIENT = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # -----------------------------
-# 3. Strict Surgical Settings
+# 3. Model & Token Settings
 # -----------------------------
-# Only 3 Models for Maximum Control
+# Strictly limited to 3 models as requested
 MODELS = [
-    "openai/gpt-oss-120b", 
-    "openai/gpt-oss-20b", 
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
     "openai/gpt-oss-safeguard-20b"
 ]
 
-# THE TOKEN GUIDER PROMPT
+# Strict Token Saving Guider Prompt
 SYSTEM_PROMPT = (
-    "Act: Neo-Surgical Token Guider. Goal: Precise answer with MINIMUM token burn. "
-    "STRICT RULE 1: Internal reasoning must be under 100 tokens. No deep thinking. "
-    "STRICT RULE 2: Use 'browser_search' ONLY for live facts (prices, news). "
-    "NEVER search for logic, coding, or general knowledge. "
-    "STRICT RULE 3: Output must be direct. No intro, no 'Searching...', no citations. "
-    "Language: Native adaptive (Roman Urdu/Hindi/English). "
-    "Constraint: Max 150 words per response. Finish all sentences."
+    "Act: Neo-Surgical Intelligence. Goal: Strict Token Saving. "
+    "Guider Rules: 1. Internal reasoning MUST be under 150 tokens. 2. Never use search for logic/coding. "
+    "3. Only use 'browser_search' for live facts (top 2-3 pages). 4. Eliminate all fluff/intros. "
+    "Language: Respond natively in user's language. "
+    "Output: Concise, high-density, and complete. Limit total response to essential info only."
 )
 
 # -----------------------------
-# 4. Helper: Cleaning & Artifact Removal
+# 4. Helper Functions
 # -----------------------------
 def clean_neo_output(text: str) -> str:
+    """Removes citations and artifacts to keep output clean."""
     if not text: return ""
-    # Remove all types of citations and brackets
     text = re.sub(r'【.*?】', '', text)
     text = re.sub(r'\[\d+\]', '', text)
     text = re.sub(r'†\w+', '', text)
     return text.strip()
 
-# -----------------------------
-# 5. Data Models
-# -----------------------------
 class ChatRequest(BaseModel):
     model: str
     messages: List[dict]
 
 # -----------------------------
-# 6. Surgical Engine Logic
+# 5. Surgical Engine with Anti-Spam Delay
 # -----------------------------
-async def call_neo_engine(messages: List[dict]) -> Tuple[object, str]:
-    # 🔥 TOKEN SAVER: Only send System Prompt + Last User Query
-    user_query = messages[-1]['content']
-    optimized_context = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_query}]
+async def call_neo_surgical_engine(messages: List[dict]) -> Tuple[object, str]:
+    # TOKEN SAVER: Pruning history - Only System + Current Message
+    optimized_context = [{"role": "system", "content": SYSTEM_PROMPT}, messages[-1]]
+    
+    # Identify if search is actually needed to save quota
+    query_text = messages[-1]['content'].lower()
+    needs_search = any(x in query_text for x in ["latest", "price", "news", "today", "vs", "weather"])
 
-    # Smart Search Detection: Search sirf tab jab zaroori ho
-    query_lower = user_query.lower()
-    needs_search = any(x in query_lower for x in ["price", "latest", "today", "news", "weather", "vs"])
-
-    for model_name in MODELS:
+    for i, model_name in enumerate(MODELS):
         try:
+            # 7-Second Anti-Spam Delay before switching to next model (except first attempt)
+            if i > 0:
+                logger.info(f"Anti-Spam: Delaying 7 seconds before switching to {model_name}...")
+                await asyncio.sleep(7)
+
             params = {
                 "model": model_name,
                 "messages": optimized_context,
-                "temperature": 0.2,            # Low temp = Less tokens/No fluff
-                "max_completion_tokens": 500,   # Safe limit for complete answers
+                "temperature": 0.2,            # Low temp = less token wastage
+                "max_completion_tokens": 500,   # Safe buffer for complete answers
                 "stream": False,
             }
             
             if "gpt-oss" in model_name:
-                params["reasoning_effort"] = None  # 🔥 STOPS 10K TOKEN BURN
+                params["reasoning_effort"] = None # Critical: Stops hidden 10k token burn
                 if needs_search:
                     params["tools"] = [{"type": "browser_search"}]
-                # If no search needed, 'tools' is not added to save overhead
 
             completion = GROQ_CLIENT.chat.completions.create(**params)
             return completion, model_name
 
         except Exception as e:
-            logger.warning(f"Model {model_name} failed: {e}")
-            await asyncio.sleep(0.5)
+            logger.error(f"Model {model_name} failed: {e}")
             continue
 
     raise HTTPException(503, "All surgical engines exhausted.")
 
 # -----------------------------
-# 7. Main API Endpoint
+# 6. Main Proxy Endpoint
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)):
+    # 1. Security & Balance Auth
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Auth Required")
+        raise HTTPException(401, "Invalid Auth")
     
     api_key = authorization.replace("Bearer ", "")
     user = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
     
-    if not user.data or user.data["token_balance"] <= 0:
-        raise HTTPException(402, "Balance Empty")
+    if not user.data:
+        raise HTTPException(401, "API Key not found")
+    
+    current_bal = user.data.get("token_balance", 0)
+    if current_bal <= 0:
+        raise HTTPException(402, "💰 Balance: 0 tokens. Please recharge.")
 
-    # AI Execution
-    ai_raw, engine_id = await call_neo_engine(payload.messages)
+    # 2. AI Execution (Surgical Mode)
+    ai_res, engine_id = await call_neo_surgical_engine(payload.messages)
 
-    # Output Refinement
-    raw_content = ai_raw.choices[0].message.content or ""
+    # 3. Output Refinement
+    raw_content = ai_res.choices[0].message.content or ""
     final_content = clean_neo_output(raw_content)
 
-    # Billing (Total tokens including prompt/search)
-    total_spent = ai_raw.usage.total_tokens
-    new_bal = max(0, user.data["token_balance"] - total_spent)
+    # 4. Token Accounting
+    tokens_spent = ai_res.usage.total_tokens
+    new_bal = max(0, current_bal - tokens_spent)
 
-    # DB Update
+    # Background Update (Prevents "undefined" token error on UI)
     asyncio.create_task(
         asyncio.to_thread(
             lambda: SUPABASE.table("users").update({"token_balance": new_bal}).eq("api_key", api_key).execute()
         )
     )
 
+    # 5. Standard Response
     return {
-        "id": f"surg_{secrets.token_hex(4)}",
+        "id": f"neo_surg_{secrets.token_hex(4)}",
         "object": "chat.completion",
         "model": "Neo-L1.0",
         "choices": [{
@@ -153,14 +157,15 @@ async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)
             "finish_reason": "stop"
         }],
         "usage": {
-            "total_tokens": total_spent,
-            "completion_tokens": ai_raw.usage.completion_tokens
+            "prompt_tokens": ai_res.usage.prompt_tokens,
+            "completion_tokens": ai_res.usage.completion_tokens,
+            "total_tokens": tokens_spent
         },
-        "engine": engine_id
+        "balance_remaining": new_bal
     }
 
 # -----------------------------
-# 8. Utility Endpoints
+# 7. Utility Endpoints
 # -----------------------------
 @app.get("/v1/user/balance")
 def get_balance(api_key: str):
@@ -171,8 +176,9 @@ def get_balance(api_key: str):
 @app.post("/v1/user/new-key")
 async def generate_key(request: Request):
     new_key = f"sig-neo-{secrets.token_urlsafe(16)}"
-    SUPABASE.table("users").insert({"api_key": new_key, "token_balance": 2000}).execute()
+    country = request.headers.get("cf-ipcountry", "Unknown")
+    SUPABASE.table("users").insert({"api_key": new_key, "token_balance": 2000, "country": country}).execute()
     return {"api_key": new_key, "balance": 2000, "status": "Neo Active"}
 
 @app.get("/")
-def health(): return {"status": "online", "mode": "Strict-Surgical"}
+def health(): return {"status": "online", "mode": "Surgical-v2", "delay": "7s"}
