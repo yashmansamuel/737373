@@ -35,9 +35,11 @@ except Exception as e:
     logger.error(f"Initialization Error: {e}")
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
+# System prompt with 2025 knowledge cutoff
 SYSTEM_PROMPT = """Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens.
 Your knowledge was last updated on July 27, 2025. You are a 2025-era AI model."""
 
+# Models in order (120B primary, then 20B, safeguard, and efficient fallback)
 GROQ_MODELS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
@@ -46,6 +48,7 @@ GROQ_MODELS = [
 ]
 
 def extract_answer_from_reasoning(reasoning: str) -> str:
+    """Extract final answer from reasoning field (for gpt-oss models)."""
     if not reasoning:
         return ""
     patterns = [
@@ -57,7 +60,9 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
     for pat in patterns:
         m = re.search(pat, reasoning, re.IGNORECASE | re.DOTALL)
         if m:
-            return m.group(1).strip()
+            ans = m.group(1).strip()
+            if ans:
+                return ans
     lines = reasoning.split('\n')
     for line in reversed(lines):
         line = line.strip()
@@ -145,25 +150,26 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
     ai_response, used_model = await call_groq_with_fallback(messages_for_groq)
 
-    # Extract content
+    # Extract assistant content
     message_obj = ai_response.choices[0].message
     assistant_content = message_obj.content or ""
     if not assistant_content.strip() and hasattr(message_obj, 'reasoning') and message_obj.reasoning:
         assistant_content = extract_answer_from_reasoning(message_obj.reasoning)
     if not assistant_content.strip():
-        assistant_content = "I'm unable to generate a response."
+        assistant_content = "I'm unable to generate a response. Please try again."
 
-    # 🔥 ONLY completion tokens are deducted (output tokens)
-    tokens_deducted = ai_response.usage.completion_tokens
-    new_balance = max(0, balance - tokens_deducted)
+    # Deduct TOTAL tokens (input + output) – user sees full burn
+    tokens_used = ai_response.usage.total_tokens
+    new_balance = max(0, balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-    # Return simplified response with transparent token usage
+    # Return simplified response with total_tokens
     return {
         "message": assistant_content.strip(),
         "usage": {
-            "completion_tokens": tokens_deducted,   # These are the tokens burned from user balance
-            "total_tokens": ai_response.usage.total_tokens   # For info only, not deducted
+            "total_tokens": tokens_used,
+            "prompt_tokens": ai_response.usage.prompt_tokens,
+            "completion_tokens": ai_response.usage.completion_tokens
         },
         "model": "Neo-L1.0 (2025)",
         "internal_model": used_model
