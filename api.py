@@ -1,13 +1,12 @@
 import os
 import logging
-import secrets
 import re
+import asyncio
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
-import asyncio
 
 load_dotenv()
 
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # App Init
 # -----------------------------
-app = FastAPI(title="Signaturesi Neo L1.0 API v3")
+app = FastAPI(title="Signaturesi Neo L1.0 API v4")
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,6 +66,7 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
             ans = m.group(1).strip()
             if ans:
                 return ans
+    # fallback
     lines = reasoning.split('\n')
     for line in reversed(lines):
         line = line.strip()
@@ -75,13 +75,11 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
     return reasoning[:200].strip()
 
 
-# -----------------------------
-# Model Selection
-# -----------------------------
 def should_use_search(messages):
     text = messages[-1]["content"].lower()
     keywords = ["latest", "current", "news", "today", "price", "2026"]
     return any(k in text for k in keywords)
+
 
 def pick_model(messages):
     text = messages[-1]["content"].lower()
@@ -91,6 +89,7 @@ def pick_model(messages):
         return "openai/gpt-oss-20b"
     else:
         return "openai/gpt-oss-120b"
+
 
 def get_reasoning_effort(messages):
     text = messages[-1]["content"].lower()
@@ -106,11 +105,11 @@ def get_reasoning_effort(messages):
 # -----------------------------
 async def call_groq(messages):
     model = pick_model(messages)
-    tools = [{"type": "browser_search"}] if should_use_search(messages) else None
+    tools = [{"type": "browser_search"}] if should_use_search(messages) else []
     reasoning_effort = get_reasoning_effort(messages)
 
     try:
-        completion = groq_client.chat.completions.create(
+        completion = await groq_client.chat.completions.create(
             messages=messages,
             model=model,
             temperature=0.7,
@@ -121,16 +120,19 @@ async def call_groq(messages):
             tools=tools
         )
         return completion, model
+
     except Exception as e:
         logger.warning(f"Primary model failed: {e}")
+
         fallback_models = [
             "openai/gpt-oss-20b",
             "openai/gpt-oss-safeguard-20b",
             "llama-3.1-8b-instant"
         ]
+
         for fb_model in fallback_models:
             try:
-                completion = groq_client.chat.completions.create(
+                completion = await groq_client.chat.completions.create(
                     messages=messages,
                     model=fb_model,
                     temperature=0.7,
@@ -141,8 +143,10 @@ async def call_groq(messages):
                     tools=tools
                 )
                 return completion, fb_model
-            except Exception:
-                await asyncio.sleep(1)
+            except Exception as e2:
+                logger.warning(f"Fallback {fb_model} failed: {e2}")
+                await asyncio.sleep(0.5)
+
         raise HTTPException(500, "All models failed")
 
 # -----------------------------
@@ -150,40 +154,8 @@ async def call_groq(messages):
 # -----------------------------
 @app.get("/")
 def home():
-    return {"status": "Online", "model": "Neo L1.0 v3"}
+    return {"status": "Online", "model": "Neo L1.0 v4"}
 
-# -----------------------------
-# USER MANAGEMENT
-# -----------------------------
-@app.get("/v1/user/balance")
-def get_balance(api_key: str):
-    try:
-        resp = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
-        if not resp.data:
-            raise HTTPException(404, "API Key not found")
-        return {"api_key": api_key, "balance": resp.data[0]["token_balance"]}
-    except Exception as e:
-        logger.error(f"Supabase Error: {e}")
-        raise HTTPException(500, "Database error")
-
-@app.post("/v1/user/new-key")
-async def generate_key(request: Request):
-    new_key = "sig-live-" + secrets.token_urlsafe(16)
-    country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
-    try:
-        supabase.table("users").insert({
-            "api_key": new_key,
-            "token_balance": 1000,
-            "country": country
-        }).execute()
-        return {"api_key": new_key, "balance": 1000, "country": country}
-    except Exception as e:
-        logger.error(f"Insert Error: {e}")
-        raise HTTPException(500, "Cannot create key")
-
-# -----------------------------
-# CHAT ROUTE
-# -----------------------------
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -196,6 +168,8 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
         raise HTTPException(400, "Invalid model")
 
     messages = body.get("messages")
+    if not messages:
+        raise HTTPException(400, "Messages missing")
 
     # -----------------------------
     # BALANCE CHECK
@@ -215,25 +189,22 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     ai_response, used_model = await call_groq(messages_for_groq)
 
     message_obj = ai_response.choices[0].message
-    assistant_content = message_obj.content or ""
+    assistant_content = getattr(message_obj, 'content', '')
 
-    reasoning_text = ""
-    if hasattr(message_obj, 'reasoning') and message_obj.reasoning:
-        reasoning_text = extract_answer_from_reasoning(message_obj.reasoning)
+    reasoning_text = getattr(message_obj, 'reasoning', '')
+    reasoning_text = extract_answer_from_reasoning(reasoning_text)
 
     if not assistant_content.strip():
         assistant_content = reasoning_text or "No response generated."
 
     # -----------------------------
-    # TOKEN LOGIC (NO LOSS)
+    # TOKEN LOGIC
     # -----------------------------
-    total_tokens = ai_response.usage.total_tokens
-    tokens_charged = int(total_tokens * 1.15)  # 15% profit margin
-    new_balance = max(0, balance - tokens_charged)
+    total_tokens = getattr(ai_response.usage, 'total_tokens', 0)
+    tokens_charged = int(total_tokens * 1.15)
 
-    supabase.table("users").update({
-        "token_balance": new_balance
-    }).eq("api_key", api_key).execute()
+    new_balance = max(0, balance - tokens_charged)
+    supabase.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
 
     # -----------------------------
     # RESPONSE
@@ -241,9 +212,7 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     return {
         "message": assistant_content.strip(),
         "reasoning": reasoning_text,
-        "usage": {
-            "total_tokens": tokens_charged
-        },
+        "usage": {"total_tokens": tokens_charged},
         "model": "Neo-L1.0",
         "internal_model": used_model
     }
