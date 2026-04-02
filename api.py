@@ -2,20 +2,24 @@ import os
 import logging
 import secrets
 import re
+import asyncio
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
-import asyncio
 
+# -----------------------------
+# Load environment and logging
+# -----------------------------
 load_dotenv()
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# -----------------------------
+# FastAPI Init
+# -----------------------------
 app = FastAPI(title="Signaturesi Neo L1.0 API")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,8 +28,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# -----------------------------
+# Supabase & Groq Initialization
+# -----------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("SUPABASE_URL or SUPABASE_KEY not set in environment variables")
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -35,11 +45,12 @@ except Exception as e:
     logger.error(f"Initialization Error: {e}")
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
-# System prompt with 2025 knowledge cutoff
+# -----------------------------
+# System Prompt & Models
+# -----------------------------
 SYSTEM_PROMPT = """Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens.
 Your knowledge was last updated on July 27, 2025. You are a 2025-era AI model."""
 
-# Models in order: 120B primary, then 20B, then safeguard, then efficient
 GROQ_MODELS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
@@ -47,6 +58,9 @@ GROQ_MODELS = [
     "llama-3.1-8b-instant",
 ]
 
+# -----------------------------
+# Helper Functions
+# -----------------------------
 def extract_answer_from_reasoning(reasoning: str) -> str:
     """Extract final answer from reasoning field (for gpt-oss models)."""
     if not reasoning:
@@ -67,22 +81,23 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
     lines = reasoning.split('\n')
     for line in reversed(lines):
         line = line.strip()
-        if line and len(line) > 10 and not line.startswith(("Mode:", "We need", "The user", "Default", "Format", "Triggers")):
+        if line and len(line) > 3 and not line.startswith(("Mode:", "We need", "The user", "Default", "Format", "Triggers")):
             return line
     return reasoning[:200].strip()
 
-async def call_groq_with_fallback(messages):
+async def call_groq_with_fallback(messages: list):
     per_model_retries = 2
     for model in GROQ_MODELS:
         for attempt in range(per_model_retries):
             try:
-                completion = groq_client.chat.completions.create(
+                # Ensure async if Groq SDK supports it
+                completion = await groq_client.chat.completions.create(
                     messages=messages,
                     model=model,
                     temperature=0.7,
                     max_completion_tokens=2048,
                     top_p=1,
-                    reasoning_effort="medium",   # keeps reasoning for gpt-oss
+                    reasoning_effort="medium",
                     stream=False,
                     tools=[{"type": "browser_search"}]
                 )
@@ -93,6 +108,9 @@ async def call_groq_with_fallback(messages):
                 await asyncio.sleep(1)
     raise HTTPException(500, "All models failed")
 
+# -----------------------------
+# Routes
+# -----------------------------
 @app.get("/")
 def home():
     return {"status": "Online", "brand": "Signaturesi", "model": "Neo L1.0 (2025)"}
@@ -115,10 +133,17 @@ async def generate_key(request: Request):
     new_key = "sig-live-" + secrets.token_urlsafe(16)
     country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
     try:
-        supabase.table("users").insert({"api_key": new_key, "token_balance": 1000, "country": country}).execute()
+        resp = supabase.table("users").insert({
+            "api_key": new_key,
+            "token_balance": 1000,
+            "country": country
+        }).execute()
+        if resp.error:
+            logger.error(f"Insert Error: {resp.error}")
+            raise HTTPException(500, "Cannot create key")
         return {"api_key": new_key, "balance": 1000, "country": country}
     except Exception as e:
-        logger.error(f"Insert Error: {e}")
+        logger.error(f"Insert Exception: {e}")
         raise HTTPException(500, "Cannot create key")
 
 @app.post("/v1/chat/completions")
@@ -134,7 +159,7 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     if not user_messages:
         raise HTTPException(400, "Missing messages")
 
-    # Check balance
+    # Check user balance
     try:
         resp = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
         if not resp.data:
@@ -148,34 +173,32 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
         logger.error(f"Balance error: {e}")
         raise HTTPException(500, "Database error")
 
-    # Prepare messages
+    # Prepare messages for Groq
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
     ai_response, used_model = await call_groq_with_fallback(messages_for_groq)
 
     # Extract content
     message_obj = ai_response.choices[0].message
-    assistant_content = message_obj.content or ""
-
-    # If empty, try reasoning field (for gpt-oss models)
+    assistant_content = getattr(message_obj, "content", "") or ""
     if not assistant_content.strip() and hasattr(message_obj, 'reasoning') and message_obj.reasoning:
         assistant_content = extract_answer_from_reasoning(message_obj.reasoning)
         logger.info(f"Extracted from reasoning for {used_model}")
 
-    # Final fallback
     if not assistant_content.strip():
         assistant_content = "I'm unable to generate a response. Please try again."
 
-    # Deduct ONLY completion tokens (output) – reduces burning significantly
-    tokens_used = ai_response.usage.completion_tokens
+    # Deduct ONLY completion tokens
+    tokens_used = getattr(ai_response.usage, "completion_tokens", 0)
     new_balance = max(0, balance - tokens_used)
-    supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
+    update_resp = supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
+    if update_resp.error:
+        logger.warning(f"Failed to deduct tokens: {update_resp.error}")
 
-    # Return simplified response for frontend
     return {
         "message": assistant_content.strip(),
         "usage": {
             "completion_tokens": tokens_used,
-            "total_tokens": ai_response.usage.total_tokens
+            "total_tokens": getattr(ai_response.usage, "total_tokens", tokens_used)
         },
         "model": "Neo-L1.0 (2025)",
         "internal_model": used_model
