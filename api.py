@@ -41,7 +41,7 @@ SUPABASE: Client = create_client(
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # -----------------------------
-# Model fallback order (Llama-3.1-8b eliminated as requested)
+# Model fallback order (Optimized)
 # -----------------------------
 MODELS = [
     "openai/gpt-oss-120b",
@@ -50,9 +50,13 @@ MODELS = [
 ]
 
 # -----------------------------
-# System prompt (Ultra-Lean & Proprietary)
+# System prompt (The Token Saver)
 # -----------------------------
-SYSTEM_PROMPT = "Proprietary Neo-Concise 2025. Triggers: [M,C,S,G]. Mode: Multi-Expert. Rule: ≤2 sentences or 3 bullets. No fillers. Direct lethal output only."
+SYSTEM_PROMPT = (
+    "Act: Neo-Concise. Task: Direct facts only. "
+    "Rule: No reasoning, no corrections, no intros. "
+    "Format: Max 20 words or 2 bullets. Just the final answer."
+)
 
 # -----------------------------
 # Pydantic models
@@ -82,6 +86,7 @@ def extract_best_content(message_obj) -> str:
     if not reasoning:
         return ""
 
+    # Extract final answer from reasoning if content is empty
     patterns = [
         r"(?i)(?:answer|output|final answer):\s*(.*)",
         r"(?i)(?:therefore|thus|so),?\s*(.*)",
@@ -93,10 +98,10 @@ def extract_best_content(message_obj) -> str:
             return match.group(1).strip()
 
     lines = [l.strip() for l in reasoning.split('\n') if len(l.strip()) > 10]
-    return lines[-1] if lines else reasoning[:200]
+    return lines[-1] if lines else reasoning[:150]
 
 # -----------------------------
-# AI call with fallback
+# AI call with fallback (Low Burn Logic)
 # -----------------------------
 async def call_ai_with_fallback(messages: List[dict]) -> Tuple[object, str]:
     for model in MODELS:
@@ -104,13 +109,15 @@ async def call_ai_with_fallback(messages: List[dict]) -> Tuple[object, str]:
             kwargs = {
                 "model": model,
                 "messages": messages,
-                "temperature": 0.3, # Lowered for more precise/concise output
-                "max_completion_tokens": 150, # Capped to save tokens
+                "temperature": 0.1,           # Strict precision
+                "max_completion_tokens": 100,  # Hard cap to prevent essay-style answers
                 "stream": False,
             }
-            # All remaining models are gpt-oss based
-            kwargs["reasoning_effort"] = "medium"
-            kwargs["tools"] = [{"type": "browser_search"}]
+            
+            # Disable heavy thinking/reasoning to save tokens
+            if "gpt-oss" in model:
+                kwargs["reasoning_effort"] = "low" 
+                kwargs["tools"] = [{"type": "browser_search"}]
 
             completion = GROQ.chat.completions.create(**kwargs)
             logger.info(f"Success with model {model}")
@@ -121,15 +128,12 @@ async def call_ai_with_fallback(messages: List[dict]) -> Tuple[object, str]:
     raise HTTPException(503, "All AI models exhausted")
 
 # -----------------------------
-# Health check
+# API Endpoints
 # -----------------------------
 @app.get("/")
 def health():
     return {"status": "online", "model": "Neo L1.0", "brand": "Signaturesi"}
 
-# -----------------------------
-# User balance
-# -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
     resp = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
@@ -137,9 +141,6 @@ def get_balance(api_key: str):
         raise HTTPException(404, "API key not found")
     return {"api_key": api_key, "balance": resp.data["token_balance"]}
 
-# -----------------------------
-# Generate new API key
-# -----------------------------
 @app.post("/v1/user/new-key", response_model=NewKeyResponse)
 async def generate_key(request: Request):
     new_key = f"sig-neo-{secrets.token_urlsafe(16)}"
@@ -151,18 +152,17 @@ async def generate_key(request: Request):
     }).execute()
     return {"api_key": new_key, "balance": 2000, "status": "Neo Active"}
 
-# -----------------------------
-# Main chat endpoint
-# -----------------------------
 @app.post("/v1/chat/completions")
 async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing or invalid API key")
+    
     api_key = authorization.replace("Bearer ", "")
-
     user = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
+    
     if not user.data:
         raise HTTPException(401, "Invalid API key")
+    
     balance = user.data["token_balance"]
     if balance <= 0:
         raise HTTPException(402, "Insufficient balance")
@@ -172,13 +172,15 @@ async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + payload.messages
 
+    # Execute AI Call
     ai_response, used_model = await call_ai_with_fallback(messages)
 
+    # Extract Content
     final_answer = extract_best_content(ai_response.choices[0].message)
     if not final_answer:
-        final_answer = "Unable to respond. Please try again."
+        final_answer = "Data unavailable. Please refine your query."
 
-    # Multiplier set for $1.20 pricing model (adjusted for 20B logic)
+    # Update Balance (Using total tokens to be safe)
     tokens_used = ai_response.usage.total_tokens
     new_balance = max(0, balance - tokens_used)
 
@@ -191,7 +193,11 @@ async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)
     return {
         "id": f"neo_{secrets.token_hex(6)}",
         "message": final_answer,
-        "usage": {"completion_tokens": ai_response.usage.completion_tokens, "total_tokens": tokens_used},
+        "usage": {
+            "prompt_tokens": ai_response.usage.prompt_tokens,
+            "completion_tokens": ai_response.usage.completion_tokens,
+            "total_tokens": tokens_used
+        },
         "model_engine": "Neo-L1.0",
         "provider": "Signaturesi",
         "internal_model": used_model
