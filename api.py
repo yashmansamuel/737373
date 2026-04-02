@@ -18,7 +18,7 @@ load_dotenv()
 # 1. Logging & App Setup
 # -----------------------------
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Neo-L1.0-Final-Production")
+logger = logging.getLogger("Neo-L1.0-Shield")
 
 app = FastAPI(title="Signaturesi Neo L1.0")
 
@@ -32,27 +32,27 @@ app.add_middleware(
 # -----------------------------
 # 2. Service Clients
 # -----------------------------
-# Ensure SUPABASE_URL, SUPABASE_KEY, and GROQ_API_KEY are in your .env
 SUPABASE: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 GROQ_CLIENT = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # -----------------------------
-# 3. GPT-Style Adaptive Settings
+# 3. GPT-Style Shield Settings
 # -----------------------------
 MODELS = ["openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b", "openai/gpt-oss-120b"]
 
-# System Prompt: Native fluency and strict formatting rules
+# Updated System Prompt with Search Limit & Native Fluidity
 SYSTEM_PROMPT = (
     "Act: Neo-Adaptive Intelligence. Task: Provide expert, high-quality responses. "
-    "Language: Respond natively in the language used by the user (Urdu, Hindi, English, etc.). "
-    "Style: Professional, fluid, and natural like GPT-4. No robotic or repetitive phrasing. "
+    "Search Rule: Use 'browser_search' ONLY for the top 3-5 most relevant pages. "
+    "DO NOT perform deep crawling or multi-page scraping to save quota. "
+    "Language: Respond natively in the language used by the user. "
     "Rules: Strictly NO internal reasoning text. Strictly NO search citations or source tags like [1] or 【†】. "
     "Completeness: Never leave a list item or sentence unfinished. Ensure full closure. "
-    "Constraint: Maintain high information density. Focus only on the current query to save tokens."
+    "Constraint: High information density. Focus only on the current query to save tokens."
 )
 
 # -----------------------------
-# 4. Helper: Final Citation & Artifact Killer
+# 4. Helper: Final Artifact Filter
 # -----------------------------
 def clean_neo_output(text: str) -> str:
     """Removes all search citations, source tags, and technical artifacts."""
@@ -61,8 +61,8 @@ def clean_neo_output(text: str) -> str:
     text = re.sub(r'【.*?】', '', text)
     text = re.sub(r'\[\d+\]', '', text)
     text = re.sub(r'†\w+', '', text)
-    # Remove any stray headers/markdown artifacts
-    text = re.sub(r'(Source|Citations|Reference):.*', '', text, flags=re.IGNORECASE)
+    # Remove stray headers/markdown artifacts
+    text = re.sub(r'(Source|Citations|Reference|Read more):.*', '', text, flags=re.IGNORECASE)
     return text.strip()
 
 # -----------------------------
@@ -73,27 +73,26 @@ class ChatRequest(BaseModel):
     messages: List[dict]
 
 # -----------------------------
-# 6. Token-Saver AI Engine
+# 6. Token & Quota Saver Engine
 # -----------------------------
 async def call_neo_engine(messages: List[dict]) -> Tuple[object, str]:
-    # 🔥 TOKEN SAVER: We only send System Prompt + the very last User Message.
-    # This keeps input costs at ~150-200 tokens instead of 1000+.
+    # 🔥 TOKEN SAVER: Only send System Prompt + last message
     if len(messages) > 0:
         optimized_context = [{"role": "system", "content": SYSTEM_PROMPT}, messages[-1]]
     else:
-        raise HTTPException(400, "No messages found in request.")
+        raise HTTPException(400, "No messages provided.")
 
     for model_name in MODELS:
         try:
             params = {
                 "model": model_name,
                 "messages": optimized_context,
-                "temperature": 0.5,           # Optimal for natural flow
-                "max_completion_tokens": 500,  # Prevents truncated/incomplete answers
+                "temperature": 0.5,           
+                "max_completion_tokens": 500,  
                 "stream": False,
             }
             
-            # Disable reasoning effort for models that support it to save billing
+            # Quota Protection: Search is enabled but restricted via prompt
             if "gpt-oss" in model_name:
                 params["reasoning_effort"] = None 
                 params["tools"] = [{"type": "browser_search"}]
@@ -105,64 +104,59 @@ async def call_neo_engine(messages: List[dict]) -> Tuple[object, str]:
             err = str(e).lower()
             logger.warning(f"Engine {model_name} failed: {err}")
             if "rate_limit" in err:
-                await asyncio.sleep(0.7) # Anti-spam delay
+                await asyncio.sleep(0.7) 
             continue
 
-    raise HTTPException(503, "All Neo Engines are currently busy. Please retry.")
+    raise HTTPException(503, "Engines overloaded. Try again later.")
 
 # -----------------------------
 # 7. Main Proxy Endpoint
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)):
-    # 1. Auth & Balance Verification
+    # Auth & Balance Check
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Authorization header missing or malformed.")
+        raise HTTPException(401, "Invalid Authorization.")
     
     api_key = authorization.replace("Bearer ", "")
-    user_query = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
+    user = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
     
-    if not user_query.data:
-        raise HTTPException(401, "Invalid API Key.")
+    if not user.data:
+        raise HTTPException(401, "Key not found.")
     
-    current_balance = user_query.data["token_balance"]
-    if current_balance <= 0:
-        raise HTTPException(402, "Token balance exhausted.")
+    current_bal = user.data["token_balance"]
+    if current_bal <= 0:
+        raise HTTPException(402, "Balance exhausted.")
 
-    # 2. AI Execution (Token-Saver Mode)
-    ai_raw_res, engine_id = await call_neo_engine(payload.messages)
+    # Execute AI (Limited Search Mode)
+    ai_raw, engine_id = await call_neo_engine(payload.messages)
 
-    # 3. Clean and Polish Output
-    raw_content = ai_raw_res.choices[0].message.content or ""
+    # Clean Output
+    raw_content = ai_raw.choices[0].message.content or ""
     final_content = clean_neo_output(raw_content)
 
-    # 4. Accurate Token Billing
-    usage_stats = ai_raw_res.usage
-    total_spent = usage_stats.total_tokens
-    updated_balance = max(0, current_balance - total_spent)
+    # Billing Update
+    total_spent = ai_raw.usage.total_tokens
+    new_bal = max(0, current_bal - total_spent)
 
-    # Update database in background to maintain speed
+    # Background DB Update
     asyncio.create_task(
         asyncio.to_thread(
-            lambda: SUPABASE.table("users").update({"token_balance": updated_balance}).eq("api_key", api_key).execute()
+            lambda: SUPABASE.table("users").update({"token_balance": new_bal}).eq("api_key", api_key).execute()
         )
     )
 
-    # 5. Return Response in OpenAI Standard Format
     return {
-        "id": f"neo_comp_{secrets.token_hex(6)}",
+        "id": f"neo_shield_{secrets.token_hex(4)}",
         "object": "chat.completion",
         "model": "Neo-L1.0",
         "choices": [{
-            "message": {
-                "role": "assistant", 
-                "content": final_content
-            },
+            "message": {"role": "assistant", "content": final_content},
             "finish_reason": "stop"
         }],
         "usage": {
-            "prompt_tokens": usage_stats.prompt_tokens,
-            "completion_tokens": usage_stats.completion_tokens,
+            "prompt_tokens": ai_raw.usage.prompt_tokens,
+            "completion_tokens": ai_raw.usage.completion_tokens,
             "total_tokens": total_spent
         }
     }
@@ -173,21 +167,15 @@ async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)
 @app.get("/v1/user/balance")
 def get_balance(api_key: str):
     res = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
-    if not res.data:
-        raise HTTPException(404, "Key not found.")
+    if not res.data: raise HTTPException(404, "Invalid Key")
     return {"api_key": api_key, "balance": res.data["token_balance"]}
 
 @app.post("/v1/user/new-key")
 async def generate_key(request: Request):
-    new_key = f"sig-neo-{secrets.token_urlsafe(20)}"
+    new_key = f"sig-neo-{secrets.token_urlsafe(16)}"
     country = request.headers.get("cf-ipcountry", "Global")
-    SUPABASE.table("users").insert({
-        "api_key": new_key, 
-        "token_balance": 2000, 
-        "country": country
-    }).execute()
-    return {"api_key": new_key, "balance": 2000, "status": "Neo Key Activated"}
+    SUPABASE.table("users").insert({"api_key": new_key, "token_balance": 2000, "country": country}).execute()
+    return {"api_key": new_key, "balance": 2000, "status": "Neo Active"}
 
 @app.get("/")
-def health_check():
-    return {"status": "online", "model": "Neo L1.0", "engine": "Stateless/Token-Saver"}
+def health(): return {"status": "online", "shield": "Active", "search_depth": "Limited (3-5 pages)"}
