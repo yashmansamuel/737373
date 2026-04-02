@@ -11,16 +11,14 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
 
-# Environment variables load karein
+# 1. Environment Variables aur Logging setup
 load_dotenv()
-
-# Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Signaturesi Neo L1.0 API")
 
-# CORS Middleware
+# 2. CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Constants aur Client Initialization
+# 3. Clients Initialization
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
@@ -39,8 +37,9 @@ try:
     logger.info("Connected to Supabase and Groq successfully.")
 except Exception as e:
     logger.error(f"Initialization Error: {e}")
-    raise RuntimeError("Critical: Cannot connect to infrastructure.")
+    raise RuntimeError("Critical: Infrastructure connection failed.")
 
+# 4. System Configuration
 SYSTEM_PROMPT = (
     "Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. "
     "Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. "
@@ -57,7 +56,7 @@ GROQ_MODELS = [
 # --- Helper Functions ---
 
 def extract_answer_from_reasoning(reasoning: str) -> str:
-    """Reasoning field se final answer nikalne ke liye optimized patterns."""
+    """Reasoning block se final answer nikalne ka logic."""
     if not reasoning:
         return ""
     
@@ -73,7 +72,7 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
             ans = m.group(1).strip()
             if ans: return ans
             
-    # Fallback: Akhri mofeed line uthayen
+    # Fallback: Last valid line
     lines = [l.strip() for l in reasoning.split('\n') if l.strip()]
     for line in reversed(lines):
         if len(line) > 10 and not any(x in line for x in ["Mode:", "Default:", "Triggers:"]):
@@ -82,7 +81,7 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
     return reasoning[:200].strip()
 
 async def call_groq_with_fallback(messages: List[Dict[str, str]]):
-    """Multiple models par fallback mechanism."""
+    """Multiple models fallback system."""
     for model in GROQ_MODELS:
         for attempt in range(2):
             try:
@@ -92,23 +91,23 @@ async def call_groq_with_fallback(messages: List[Dict[str, str]]):
                     temperature=0.7,
                     max_completion_tokens=2048,
                     top_p=1,
-                    reasoning_effort="medium",
+                    reasoning_effort="medium", # Keeps CoT reasoning
                     stream=False,
-                    tools=[{"type": "browser_search"}]
+                    # Note: Kuch models tools support nahi karte, fallback handle karega
+                    tools=[{"type": "browser_search"}] 
                 )
-                logger.info(f"Success with model: {model}")
                 return completion, model
             except Exception as e:
-                logger.warning(f"Model {model} failed on attempt {attempt+1}: {e}")
+                logger.warning(f"Model {model} failed (Attempt {attempt+1}): {e}")
                 await asyncio.sleep(1)
                 
-    raise HTTPException(status_code=500, detail="All AI models are currently unavailable.")
+    raise HTTPException(status_code=500, detail="All AI engines are busy. Try again.")
 
-# --- API Endpoints ---
+# --- Endpoints ---
 
 @app.get("/")
 def home():
-    return {"status": "Online", "brand": "Signaturesi", "version": "Neo L1.0 (2025)"}
+    return {"status": "Online", "brand": "Signaturesi", "engine": "Neo L1.0"}
 
 @app.get("/v1/user/balance")
 def get_balance(api_key: str):
@@ -119,13 +118,12 @@ def get_balance(api_key: str):
         return {"api_key": api_key, "balance": resp.data[0]["token_balance"]}
     except Exception as e:
         if isinstance(e, HTTPException): raise e
-        logger.error(f"Supabase Error: {e}")
-        raise HTTPException(500, "Internal database error")
+        raise HTTPException(500, "Database error")
 
 @app.post("/v1/user/new-key")
 async def generate_key(request: Request):
     new_key = f"sig-live-{secrets.token_urlsafe(16)}"
-    country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
+    country = request.headers.get("x-vercel-ip-country") or "Unknown"
     
     try:
         supabase.table("users").insert({
@@ -133,74 +131,73 @@ async def generate_key(request: Request):
             "token_balance": 1000, 
             "country": country
         }).execute()
-        return {"api_key": new_key, "balance": 1000, "country": country}
+        return {"api_key": new_key, "balance": 1000}
     except Exception as e:
-        logger.error(f"Key Generation Error: {e}")
-        raise HTTPException(500, "Could not generate new key")
+        raise HTTPException(500, "Key generation failed")
 
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
-    # Auth Validation
+    # 1. Validation
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Missing or invalid Authorization header")
+        raise HTTPException(401, "Auth header missing")
     
     user_api_key = authorization.split(" ")[1]
     body = await request.json()
     
     if body.get("model") != "Neo-L1.0":
-        raise HTTPException(400, "Invalid model selection. Use 'Neo-L1.0'")
+        raise HTTPException(400, "Use 'Neo-L1.0' as model name")
     
     user_messages = body.get("messages")
     if not user_messages:
         raise HTTPException(400, "No messages provided")
 
-    # User Check & Balance Validation
+    # 2. Balance Check
     try:
         resp = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
         if not resp.data:
-            raise HTTPException(401, "Unauthorized: Invalid API Key")
+            raise HTTPException(401, "Invalid Key")
         
-        current_balance = resp.data[0]["token_balance"]
-        if current_balance <= 0:
-            raise HTTPException(402, "Payment Required: Balance exhausted")
+        balance = resp.data[0]["token_balance"]
+        if balance <= 0:
+            raise HTTPException(402, "Insufficient tokens")
     except Exception as e:
         if isinstance(e, HTTPException): raise e
-        logger.error(f"Database/Auth Error: {e}")
-        raise HTTPException(500, "Internal Server Error")
+        raise HTTPException(500, "Auth server error")
 
-    # AI Call
+    # 3. AI Processing
     messages_payload = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
     ai_response, used_model = await call_groq_with_fallback(messages_payload)
 
-    # Content Processing
+    # 4. Content & Reasoning Extraction
     res_msg = ai_response.choices[0].message
     content = res_msg.content or ""
+    # Reasoning field capture kar rahe hain
+    raw_reasoning = getattr(res_msg, 'reasoning', "") 
 
-    # Check for empty content in gpt-oss reasoning models
-    if not content.strip() and hasattr(res_msg, 'reasoning') and res_msg.reasoning:
-        content = extract_answer_from_reasoning(res_msg.reasoning)
-        logger.info(f"Answer extracted from reasoning field for {used_model}")
+    # Agar content blank hai (gpt-oss behavior), toh reasoning se extract karein
+    if not content.strip() and raw_reasoning:
+        content = extract_answer_from_reasoning(raw_reasoning)
 
-    if not content.strip():
-        content = "AI response generation failed. Please refine your prompt."
-
-    # Token Accounting (Deduct only completion/output tokens)
-    tokens_consumed = ai_response.usage.completion_tokens
-    updated_balance = max(0, current_balance - tokens_consumed)
+    # 5. Token Accounting
+    # 'completion_tokens' mein reasoning + answer dono count hote hain
+    tokens_used = ai_response.usage.completion_tokens
+    new_balance = max(0, balance - tokens_used)
     
     try:
-        supabase.table("users").update({"token_balance": updated_balance}).eq("api_key", user_api_key).execute()
+        supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
     except Exception as e:
-        logger.error(f"Balance Update Failed: {e}")
+        logger.error(f"Failed to update balance: {e}")
 
+    # 6. Final Response
     return {
-        "message": content.strip(),
+        "message": content.strip() or "Sorry, I couldn't generate an answer.",
+        "reasoning": raw_reasoning.strip(), # Frontend pe show karne ke liye
         "usage": {
-            "completion_tokens": tokens_consumed,
+            "completion_tokens": tokens_used,
             "total_tokens": ai_response.usage.total_tokens
         },
         "model_info": {
-            "public_name": "Neo-L1.0 (2025)",
-            "engine": used_model
+            "public_name": "Neo-L1.0",
+            "internal_engine": used_model
         }
     }
