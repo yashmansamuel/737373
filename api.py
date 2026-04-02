@@ -3,8 +3,8 @@ import logging
 import secrets
 import re
 import asyncio
-from typing import List, Tuple, Optional
-from fastapi import FastAPI, Request, HTTPException, Header, Depends
+from typing import List, Tuple
+from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
@@ -15,214 +15,159 @@ from groq import Groq
 load_dotenv()
 
 # -----------------------------
-# 1. Logging Configuration
+# 1. Logging & App Setup
 # -----------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("Neo-L1.0-Core")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Neo-L1.0-Final")
 
-# -----------------------------
-# 2. FastAPI Initialization
-# -----------------------------
-app = FastAPI(
-    title="Signaturesi Neo L1.0",
-    description="Universal AI Engine with Search & Logic Optimization",
-    version="1.0.0"
-)
+app = FastAPI(title="Signaturesi Neo L1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Change this to your specific domain in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # -----------------------------
-# 3. External Service Clients
+# 2. Service Clients
 # -----------------------------
-try:
-    SUPABASE: Client = create_client(
-        os.getenv("SUPABASE_URL"),
-        os.getenv("SUPABASE_KEY")
-    )
-    GROQ_CLIENT = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    logger.info("External services initialized successfully.")
-except Exception as e:
-    logger.error(f"Critical Service Failure: {e}")
-    raise RuntimeError("Backend services failed to start.")
+SUPABASE: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+GROQ_CLIENT = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # -----------------------------
-# 4. Global Settings & Prompts
+# 3. GPT-Style Adaptive Settings
 # -----------------------------
-MODELS = [
-    "openai/gpt-oss-20b",           # Fast, stable, high rate limits
-    "openai/gpt-oss-safeguard-20b", # Security-focused fallback
-    "openai/gpt-oss-120b"           # High-intelligence fallback
-]
+MODELS = ["openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b", "openai/gpt-oss-120b"]
 
-# Universal System Prompt: Optimized for high-density, clean output.
+# Updated for Native Fluidity & Citation Removal
 SYSTEM_PROMPT = (
-    "Act: Neo-Universal Assistant. Task: Provide high-quality, accurate, and direct responses. "
-    "Guidelines: Use search for real-time facts. Maintain a neutral, professional tone. "
-    "Rules: Strictly no internal reasoning text, no conversational fillers (e.g., 'Okay', 'I found'), "
-    "and no search citations or technical tags (e.g., [1], 【†】). "
-    "Ensure every sentence is grammatically complete. "
-    "Constraint: Keep it under 4 concise sentences or 5 clear bullets for general queries. "
-    "For code or technical tasks, provide the full necessary logic directly."
+    "Act: Neo-Adaptive Intelligence. Task: Provide expert, high-quality responses. "
+    "Language: Respond natively in the language used by the user (e.g., Urdu, Hindi, English). "
+    "Style: Professional, fluid, and natural like GPT-4. No robotic phrasing. "
+    "Rules: Strictly no internal reasoning text. Strictly NO search citations or source tags like [1] or 【†】. "
+    "Completeness: Ensure every sentence is grammatically finished and polished. "
+    "Constraint: Maintain high information density. Concise but fully helpful."
 )
 
 # -----------------------------
-# 5. Data Models (Pydantic)
+# 4. Helper: Advanced Cleaning
+# -----------------------------
+def clean_neo_output(text: str) -> str:
+    """Removes all search citations, source tags, and technical artifacts."""
+    if not text: return ""
+    # Remove citations like 【1†L168-L178】, [1], [2], etc.
+    text = re.sub(r'【.*?】', '', text)
+    text = re.sub(r'\[\d+\]', '', text)
+    text = re.sub(r'†\w+', '', text)
+    # Remove any stray markdown artifacts from search tools
+    text = text.replace("Source:", "").replace("Citations:", "")
+    return text.strip()
+
+# -----------------------------
+# 5. Data Models
 # -----------------------------
 class ChatRequest(BaseModel):
     model: str
     messages: List[dict]
 
-class BalanceResponse(BaseModel):
-    api_key: str
-    balance: int
-
-class NewKeyResponse(BaseModel):
-    api_key: str
-    balance: int
-    status: str
-
 # -----------------------------
-# 6. Helper Functions
+# 6. AI Engine Logic
 # -----------------------------
-def clean_output(text: str) -> str:
-    """Removes search citations and cleans up technical clutter."""
-    # Remove citations like [1], [2], 【4†L308-L311】 etc.
-    text = re.sub(r'\[\d+\]', '', text)
-    text = re.sub(r'【.*?】', '', text)
-    return text.strip()
-
-async def call_groq_engine(messages: List[dict]) -> Tuple[object, str]:
-    """Handles logic for model fallback and API communication."""
-    # Context Pruning: Keeps System Prompt + Last 2 interactions to save $
-    optimized_context = [messages[0]] + messages[-2:] if len(messages) > 2 else messages
+async def call_neo_engine(messages: List[dict]) -> Tuple[object, str]:
+    # Context Optimization: System Prompt + Current Query
+    optimized_context = [messages[0], messages[-1]] 
 
     for model_name in MODELS:
         try:
-            logger.info(f"Attempting query with model: {model_name}")
-            
-            # Request Parameters
-            kwargs = {
+            params = {
                 "model": model_name,
                 "messages": optimized_context,
-                "temperature": 0.2,            # Balanced: Precise but natural
-                "max_completion_tokens": 250,   # Longer cap for quality responses
+                "temperature": 0.5,           # Increased for GPT-like natural flow
+                "max_completion_tokens": 300,  # Enough for detailed native responses
                 "stream": False,
             }
-
-            # Search & Reasoning Logic
+            
             if "gpt-oss" in model_name:
-                kwargs["reasoning_effort"] = None  # Prevents reasoning-token billing
-                kwargs["tools"] = [{"type": "browser_search"}]
+                params["reasoning_effort"] = None 
+                params["tools"] = [{"type": "browser_search"}]
 
-            response = GROQ_CLIENT.chat.completions.create(**kwargs)
-            return response, model_name
+            completion = GROQ_CLIENT.chat.completions.create(**params)
+            return completion, model_name
 
         except Exception as e:
-            err_msg = str(e).lower()
-            logger.warning(f"Model {model_name} failed: {err_msg}")
-            
-            if "rate_limit" in err_msg or "429" in err_msg:
-                await asyncio.sleep(0.7) # Safety delay
+            err = str(e).lower()
+            logger.warning(f"Engine {model_name} error: {err}")
+            if "rate_limit" in err: await asyncio.sleep(0.6)
             continue
 
-    raise HTTPException(status_code=503, detail="All AI engines are currently at capacity.")
+    raise HTTPException(503, "All Neo-Engines exhausted.")
 
 # -----------------------------
-# 7. API Endpoints
+# 7. Main Proxy Endpoint
 # -----------------------------
-
-@app.get("/")
-async def root():
-    return {"status": "active", "engine": "Neo-L1.0", "version": "1.0.0"}
-
-@app.get("/v1/user/balance", response_model=BalanceResponse)
-async def get_user_balance(api_key: str):
-    result = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Invalid API Key provided.")
-    return {"api_key": api_key, "balance": result.data["token_balance"]}
-
-@app.post("/v1/user/new-key", response_model=NewKeyResponse)
-async def create_api_key(request: Request):
-    try:
-        generated_key = f"sig-neo-{secrets.token_urlsafe(24)}"
-        ip_country = request.headers.get("cf-ipcountry", "Unknown")
-        
-        SUPABASE.table("users").insert({
-            "api_key": generated_key,
-            "token_balance": 2000, # Starting credits
-            "country": ip_country
-        }).execute()
-        
-        return {"api_key": generated_key, "balance": 2000, "status": "Activated"}
-    except Exception as e:
-        logger.error(f"Key generation failed: {e}")
-        raise HTTPException(status_code=500, detail="Database error during registration.")
-
 @app.post("/v1/chat/completions")
-async def chat_endpoint(payload: ChatRequest, authorization: str = Header(None)):
-    # 1. Security Check
+async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)):
+    # Auth Check
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing authorization header.")
+        raise HTTPException(401, "Auth Required")
     
-    user_api_key = authorization.replace("Bearer ", "")
-    user_query = SUPABASE.table("users").select("token_balance").eq("api_key", user_api_key).maybe_single().execute()
+    api_key = authorization.replace("Bearer ", "")
+    user = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
     
-    if not user_query.data:
-        raise HTTPException(status_code=401, detail="Unauthorized: Key not found.")
-    
-    current_tokens = user_query.data["token_balance"]
-    if current_tokens <= 0:
-        raise HTTPException(status_code=402, detail="Token balance exhausted. Please top up.")
+    if not user.data or user.data["token_balance"] <= 0:
+        raise HTTPException(402, "Insufficient tokens")
 
-    # 2. AI Processing
-    formatted_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + payload.messages
-    ai_raw_response, engine_id = await call_groq_engine(formatted_messages)
+    # AI Execution
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + payload.messages
+    ai_raw, engine_id = await call_neo_engine(full_messages)
 
-    # 3. Output Refinement
-    raw_content = ai_raw_response.choices[0].message.content or ""
-    final_content = clean_output(raw_content)
+    # Content Refinement (The Citation Killer)
+    raw_text = ai_raw.choices[0].message.content or ""
+    final_text = clean_neo_output(raw_text)
 
-    # 4. Token Accounting
-    usage_stats = ai_raw_response.usage
-    total_spent = usage_stats.total_tokens
-    new_bal = max(0, current_tokens - total_spent)
+    # Billing Update
+    total_tokens = ai_raw.usage.total_tokens
+    new_bal = max(0, user.data["token_balance"] - total_tokens)
 
-    # Background update for performance
     asyncio.create_task(
         asyncio.to_thread(
-            lambda: SUPABASE.table("users").update({"token_balance": new_bal}).eq("api_key", user_api_key).execute()
+            lambda: SUPABASE.table("users").update({"token_balance": new_bal}).eq("api_key", api_key).execute()
         )
     )
 
-    # 5. Return OpenAI-Compatible JSON
+    # Standard OpenAI Format Response
     return {
-        "id": f"neo_gen_{secrets.token_hex(6)}",
+        "id": f"neo_{secrets.token_hex(4)}",
         "object": "chat.completion",
-        "created": 1712000000, # Placeholder timestamp
         "model": "Neo-L1.0",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": final_content
-                },
-                "finish_reason": "stop"
-            }
-        ],
+        "choices": [{
+            "message": {"role": "assistant", "content": final_text},
+            "finish_reason": "stop"
+        }],
         "usage": {
-            "prompt_tokens": usage_stats.prompt_tokens,
-            "completion_tokens": usage_stats.completion_tokens,
-            "total_tokens": total_spent
+            "prompt_tokens": ai_raw.usage.prompt_tokens,
+            "completion_tokens": ai_raw.usage.completion_tokens,
+            "total_tokens": total_tokens
         },
-        "engine_details": engine_id
+        "engine_used": engine_id
     }
+
+# -----------------------------
+# 8. Utility Endpoints
+# -----------------------------
+@app.get("/v1/user/balance")
+def get_balance(api_key: str):
+    res = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
+    if not res.data: raise HTTPException(404, "Invalid Key")
+    return {"api_key": api_key, "balance": res.data["token_balance"]}
+
+@app.post("/v1/user/new-key")
+async def generate_key(request: Request):
+    new_key = f"sig-neo-{secrets.token_urlsafe(16)}"
+    country = request.headers.get("cf-ipcountry", "Global")
+    SUPABASE.table("users").insert({"api_key": new_key, "token_balance": 2000, "country": country}).execute()
+    return {"api_key": new_key, "balance": 2000, "status": "Neo Active"}
+
+@app.get("/")
+def health(): return {"status": "online", "model": "Neo L1.0"}
