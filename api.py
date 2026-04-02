@@ -1,6 +1,7 @@
 import os
 import logging
 import secrets
+import re
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -41,6 +42,59 @@ GROQ_MODELS = [
     "openai/gpt-oss-safeguard-20b",
 ]
 
+def extract_final_answer_from_reasoning(reasoning_text: str) -> str:
+    """
+    Try to extract the actual answer from the model's reasoning field.
+    The reasoning usually ends with the answer after phrases like 'So we answer:' or 'Final:' or just the last sentence.
+    """
+    if not reasoning_text:
+        return "No response generated."
+    
+    # Look for patterns like "So we answer: ..." or "Final answer: ..."
+    patterns = [
+        r"So (?:we )?answer:?\s*(.+?)(?:\n\n|$)",
+        r"Final (?:answer|output):?\s*(.+?)(?:\n\n|$)",
+        r"Output:?\s*(.+?)(?:\n\n|$)",
+        r"Therefore,?\s*(.+?)(?:\n\n|$)",
+    ]
+    for pat in patterns:
+        match = re.search(pat, reasoning_text, re.IGNORECASE | re.DOTALL)
+        if match:
+            return match.group(1).strip()
+    
+    # If no pattern, take the last sentence or bullet list after the last "."
+    # Split by newlines and find the last non-empty line that looks like an answer
+    lines = reasoning_text.split('\n')
+    for line in reversed(lines):
+        line = line.strip()
+        if line and not line.startswith(("Mode:", "We need", "The user", "Default", "Format", "Triggers")):
+            # Check if it contains bullet or sentence-like structure
+            if re.match(r'^[\*\-\•]|^[A-Z0-9]', line) or len(line) > 10:
+                return line
+    
+    # Fallback: return last 200 chars
+    return reasoning_text[-200:].strip()
+
+async def call_groq_with_fallback(messages):
+    per_model_retries = 2
+    for model in GROQ_MODELS:
+        for attempt in range(per_model_retries):
+            try:
+                completion = groq_client.chat.completions.create(
+                    messages=messages,
+                    model=model,
+                    temperature=0.7,
+                    max_completion_tokens=200,   # enough for reasoning + short answer
+                    top_p=1,
+                    stream=False,
+                )
+                logger.info(f"Success with model {model}")
+                return completion
+            except Exception as e:
+                logger.warning(f"Model {model}, attempt {attempt+1} failed: {e}")
+                await asyncio.sleep(1)
+    raise HTTPException(status_code=500, detail="All Groq models failed")
+
 @app.get("/")
 def home():
     return {"status": "Online", "brand": "Signaturesi", "model": "Neo L1.0"}
@@ -74,26 +128,6 @@ async def generate_key(request: Request):
         logger.error(f"Supabase Insert Error: {e}")
         raise HTTPException(status_code=500, detail="Cannot create new API key")
 
-async def call_groq_with_fallback(messages):
-    per_model_retries = 2
-    for model in GROQ_MODELS:
-        for attempt in range(per_model_retries):
-            try:
-                completion = groq_client.chat.completions.create(
-                    messages=messages,
-                    model=model,
-                    temperature=0.7,
-                    max_completion_tokens=200,   # Enough for reasoning + short answer
-                    top_p=1,
-                    stream=False,
-                )
-                logger.info(f"Success with model {model}")
-                return completion
-            except Exception as e:
-                logger.warning(f"Model {model}, attempt {attempt+1} failed: {e}")
-                await asyncio.sleep(1)
-    raise HTTPException(status_code=500, detail="All Groq models failed")
-
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -122,15 +156,21 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
     ai_response = await call_groq_with_fallback(messages_for_groq)
 
-    # Extract content, fallback to reasoning if content empty
     message_obj = ai_response.choices[0].message
-    assistant_content = message_obj.content or message_obj.reasoning or "No response generated."
+    assistant_content = message_obj.content or ""
+    
+    # If content is empty, extract from reasoning
+    if not assistant_content.strip() and hasattr(message_obj, 'reasoning') and message_obj.reasoning:
+        assistant_content = extract_final_answer_from_reasoning(message_obj.reasoning)
+        logger.info(f"Extracted answer from reasoning: {assistant_content[:100]}")
+    
+    if not assistant_content.strip():
+        assistant_content = "I'm unable to generate a response. Please try again."
 
     tokens_used = ai_response.usage.completion_tokens
     new_balance = max(0, current_balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-    # Return simplified response
     return {
         "message": assistant_content,
         "usage": {
