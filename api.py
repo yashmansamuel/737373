@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from groq import Groq
+from groq import Groq # Standard Groq client
 
 load_dotenv()
 
@@ -29,6 +29,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    # Ensure GROQ_API_KEY is in your .env
     groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
     logger.info("Connected to Supabase and Groq successfully.")
 except Exception as e:
@@ -38,16 +39,15 @@ except Exception as e:
 SYSTEM_PROMPT = """Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens.
 Your knowledge was last updated on July 27, 2025. You are a 2025-era AI model."""
 
-# Note: Ensure these model IDs are correct for your Groq access
 GROQ_MODELS = [
-    "llama-3.3-70b-versatile", 
-    "llama-3.1-70b-versatile",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-safeguard-20b",
     "llama-3.1-8b-instant",
 ]
 
 def extract_answer_from_reasoning(reasoning: str) -> str:
-    if not reasoning:
-        return ""
+    if not reasoning: return ""
     patterns = [
         r"(?:So|Therefore|Thus),?\s*(?:we )?answer:?\s*(.+?)(?:\n\n|$)",
         r"Final (?:answer|output):?\s*(.+?)(?:\n\n|$)",
@@ -56,28 +56,28 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
     for pat in patterns:
         m = re.search(pat, reasoning, re.IGNORECASE | re.DOTALL)
         if m:
-            ans = m.group(1).strip()
-            if ans: return ans
+            return m.group(1).strip()
     
-    lines = [l.strip() for l in reasoning.split('\n') if l.strip()]
+    lines = [line.strip() for line in reasoning.split('\n') if line.strip()]
     for line in reversed(lines):
-        if len(line) > 10 and not line.startswith(("Mode:", "We need")):
+        if len(line) > 10 and not line.startswith(("Mode:", "We need", "The user")):
             return line
     return reasoning[:200].strip()
 
 async def call_groq_with_fallback(messages):
-    loop = asyncio.get_event_loop()
+    per_model_retries = 2
     for model in GROQ_MODELS:
-        for attempt in range(2):
+        for attempt in range(per_model_retries):
             try:
-                # Running sync call in thread to avoid blocking
+                # Running blocking Groq call in a thread to keep FastAPI async
+                loop = asyncio.get_event_loop()
                 completion = await loop.run_in_executor(
                     None, 
                     lambda: groq_client.chat.completions.create(
                         messages=messages,
                         model=model,
                         temperature=0.7,
-                        max_tokens=2048, # Changed from max_completion_tokens
+                        max_tokens=2048, # Changed from max_completion_tokens for compatibility
                         top_p=1,
                         stream=False
                     )
@@ -95,15 +95,21 @@ def home():
 
 @app.get("/v1/user/balance")
 def get_balance(api_key: str):
-    resp = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
-    if not resp.data:
-        raise HTTPException(404, "API Key not found")
-    return {"api_key": api_key, "balance": resp.data[0]["token_balance"]}
+    try:
+        resp = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
+        if not resp.data:
+            raise HTTPException(404, "API Key not found")
+        return {"api_key": api_key, "balance": resp.data[0]["token_balance"]}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        logger.error(f"Supabase Error: {e}")
+        raise HTTPException(500, "Database error")
 
 @app.post("/v1/user/new-key")
 async def generate_key(request: Request):
     new_key = "sig-live-" + secrets.token_urlsafe(16)
-    country = request.headers.get("x-vercel-ip-country") or "Unknown"
+    headers = request.headers
+    country = headers.get("x-vercel-ip-country") or headers.get("cf-ipcountry") or "Unknown"
     try:
         supabase.table("users").insert({"api_key": new_key, "token_balance": 1000, "country": country}).execute()
         return {"api_key": new_key, "balance": 1000, "country": country}
@@ -121,38 +127,46 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     
     if body.get("model") != "Neo-L1.0":
         raise HTTPException(400, "Invalid model. Use 'Neo-L1.0'")
+    
+    user_messages = body.get("messages")
+    if not user_messages:
+        raise HTTPException(400, "Missing messages")
 
     # Check balance
-    resp = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
-    if not resp.data:
-        raise HTTPException(401, "Invalid API Key")
-    
-    balance = resp.data[0]["token_balance"]
-    if balance <= 0:
-        raise HTTPException(402, "Insufficient Balance")
+    try:
+        resp = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
+        if not resp.data:
+            raise HTTPException(401, "Invalid API Key")
+        balance = resp.data[0]["token_balance"]
+        if balance <= 0:
+            raise HTTPException(402, "Insufficient Balance")
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(500, "Database error")
 
-    user_messages = body.get("messages", [])
+    # Prepare messages
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
-    
     ai_response, used_model = await call_groq_with_fallback(messages_for_groq)
 
+    # Extract content
     message_obj = ai_response.choices[0].message
     assistant_content = message_obj.content or ""
 
-    # Check for reasoning if content is empty (for specific models)
+    # Check for reasoning if content is empty (Specific to some OSS model implementations)
     if not assistant_content.strip() and hasattr(message_obj, 'reasoning'):
         assistant_content = extract_answer_from_reasoning(message_obj.reasoning)
 
     if not assistant_content.strip():
-        assistant_content = "I'm unable to generate a response."
+        assistant_content = "I'm unable to generate a response. Please try again."
 
     # Update Balance
     tokens_used = ai_response.usage.completion_tokens
     new_balance = max(0, balance - tokens_used)
+    
     try:
         supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
     except Exception as e:
-        logger.error(f"Balance update failed: {e}")
+        logger.error(f"Update balance failed: {e}")
 
     return {
         "message": assistant_content.strip(),
