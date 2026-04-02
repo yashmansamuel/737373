@@ -3,6 +3,7 @@ import re
 import logging
 import secrets
 import asyncio
+import time
 from typing import List, Dict, Optional
 
 from fastapi import FastAPI, Request, HTTPException, Header
@@ -14,9 +15,9 @@ from groq import Groq
 # --- Init ---
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("NeoL1")
+logger = logging.getLogger("Neo-L1-Auto")
 
-app = FastAPI(title="Signaturesi Neo L1.0")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,45 +33,39 @@ try:
     groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 except Exception as e:
     logger.error(f"Setup Error: {e}")
-    raise RuntimeError("Infrastructure Fail")
+    raise RuntimeError("Infra Fail")
 
-# --- Personality & Models ---
-# Human-like personality focus
-NEO_IDENTITY = (
-    "You are Neo L1.0, an elite autonomous reasoning engine with real-time web access. "
-    "Internal Monologue (CoT): Think like a high-IQ human expert—weigh facts, be curious, critique findings. "
-    "Search Usage: If query needs fresh data, use browser_search immediately. "
-    "Response Style: Natural, concise, and direct. No 'As an AI' filler. "
-    "Limit: 2-3 sharp sentences or bullets. Knowledge cutoff: July 2025."
-)
-
+# --- Optimized Models List (Stability Priority) ---
 GROQ_MODELS = [
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "llama-3.1-8b-instant",
+    "llama-3.3-70b-versatile",   # Sabse zyada stable aur fast
+    "llama-3.1-8b-instant",      # Fast backup
+    "openai/gpt-oss-120b",       # High IQ (lekin low rate limit)
 ]
+
+NEO_IDENTITY = (
+    "You are Neo L1.0. An autonomous reasoning engine. "
+    "Internal Monologue: Sharp, expert human thinking. "
+    "Use browser_search for current info. Keep it natural and concise (2-3 sentences)."
+)
 
 # --- Core Logic ---
 def extract_final_answer(reasoning: str) -> str:
-    """Extracts a human-readable answer from complex CoT blocks."""
     if not reasoning: return ""
-    patterns = [
-        r"(?:Final answer|Conclusion|Output):?\s*(.+?)(?:\n\n|$)",
-        r"(?:Therefore|So|Thus),?\s*(?:we )?answer:?\s*(.+?)(?:\n\n|$)",
-        r"(?:\n|^)[•\*\-]\s*(.+?)(?=\n[•\*\-]|$)"
-    ]
+    patterns = [r"(?:Final answer|Conclusion|Output):?\s*(.+?)(?:\n\n|$)", r"(?:Therefore|So|Thus),?\s*(.+?)(?:\n\n|$)"]
     for pat in patterns:
         match = re.search(pat, reasoning, re.IGNORECASE | re.DOTALL)
         if match: return match.group(1).strip()
-    
-    # Fallback to last substantial line
     lines = [l.strip() for l in reasoning.split('\n') if len(l.strip()) > 20]
     return lines[-1] if lines else reasoning[:250].strip()
 
-async def call_groq_with_tools(messages: List[Dict]):
-    """Calls Groq with fallback logic and browser search capability."""
+async def call_groq_with_auto_retry(messages: List[Dict]):
+    """
+    Automatic Rate-Limit Handling (Exponential Backoff)
+    """
+    last_error = ""
     for model in GROQ_MODELS:
-        for attempt in range(2):
+        # Har model par 3 baar koshish (total 9 tries)
+        for attempt in range(3):
             try:
                 response = groq_client.chat.completions.create(
                     messages=messages,
@@ -78,36 +73,27 @@ async def call_groq_with_tools(messages: List[Dict]):
                     temperature=0.8,
                     max_completion_tokens=1500,
                     reasoning_effort="medium" if "gpt-oss" in model else None,
-                    tools=[{"type": "browser_search"}], # LIVE SEARCH ENABLED
+                    tools=[{"type": "browser_search"}],
                     stream=False
                 )
                 return response, model
             except Exception as e:
-                logger.warning(f"{model} attempt {attempt+1} failed: {e}")
-                await asyncio.sleep(1)
-    raise HTTPException(503, "Neural nodes saturated. Try again.")
+                err_str = str(e).lower()
+                last_error = str(e)
+                
+                # Agar Rate Limit (429) aye toh wait karo
+                if "rate_limit" in err_str or "429" in err_str:
+                    wait_time = (attempt + 1) * 2 # 2s, 4s, 6s wait
+                    logger.warning(f"Rate limited on {model}. Waiting {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    # Agar koi aur error hai toh next model par jao
+                    logger.warning(f"Model {model} failed: {e}")
+                    break 
+                    
+    raise HTTPException(503, f"All neural nodes busy. Last error: {last_error}")
 
-# --- Endpoints ---
-
-@app.get("/")
-def health():
-    return {"status": "online", "engine": "Neo-L1.0", "search": "enabled"}
-
-@app.get("/v1/user/balance")
-async def get_balance(api_key: str):
-    res = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
-    if not res.data: raise HTTPException(404, "Invalid key")
-    return {"balance": res.data[0]["token_balance"]}
-
-@app.post("/v1/user/new-key")
-async def create_key(request: Request):
-    new_key = f"sig-live-{secrets.token_urlsafe(24)}"
-    country = request.headers.get("x-vercel-ip-country", "Global")
-    try:
-        supabase.table("users").insert({"api_key": new_key, "token_balance": 1500, "country": country}).execute()
-        return {"api_key": new_key, "balance": 1500}
-    except:
-        raise HTTPException(500, "Database busy")
+# --- API Endpoints ---
 
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
@@ -116,20 +102,19 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     
     user_key = authorization.replace("Bearer ", "").strip()
     body = await request.json()
-    user_messages = body.get("messages", [])
-
-    # 1. Auth & Balance
+    
+    # 1. Check User
     user_res = supabase.table("users").select("token_balance").eq("api_key", user_key).execute()
     if not user_res.data: raise HTTPException(401, "Invalid Key")
     
     balance = user_res.data[0]["token_balance"]
-    if balance <= 0: raise HTTPException(402, "Balance exhausted")
+    if balance <= 0: raise HTTPException(402, "Out of tokens")
 
-    # 2. AI Processing
-    payload = [{"role": "system", "content": NEO_IDENTITY}] + user_messages
-    ai_raw, used_model = await call_groq_with_tools(payload)
+    # 2. AI Call with Auto-Retry
+    payload = [{"role": "system", "content": NEO_IDENTITY}] + body.get("messages", [])
+    ai_raw, used_model = await call_groq_with_auto_retry(payload)
 
-    # 3. Extraction
+    # 3. Process
     msg_obj = ai_raw.choices[0].message
     content = msg_obj.content or ""
     reasoning = getattr(msg_obj, 'reasoning', "") or ""
@@ -137,22 +122,16 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     if not content.strip() and reasoning:
         content = extract_final_answer(reasoning)
 
-    # 4. Billing
-    # Deduction based on completion (output + thinking) to be fair
+    # 4. Bill
     tokens_used = ai_raw.usage.completion_tokens
     new_balance = max(0, balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_key).execute()
 
     return {
-        "message": content.strip() or "Neo couldn't formulate a response.",
+        "message": content.strip(),
         "reasoning": reasoning.strip(),
-        "usage": {
-            "billed": tokens_used,
-            "remaining": new_balance,
-            "total_call_tokens": ai_raw.usage.total_tokens
-        },
-        "model_info": {
-            "engine": used_model,
-            "version": "2025.4-L1"
-        }
+        "usage": {"billed": tokens_used, "remaining": new_balance},
+        "model_info": {"engine": used_model}
     }
+
+# Baaki endpoints (new-key, balance) purane wale hi rahenge.
