@@ -2,24 +2,18 @@ import os
 import logging
 import secrets
 import re
-import asyncio
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
+import asyncio
 
 load_dotenv()
 
-# -----------------------------
-# Logger
-# -----------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# -----------------------------
-# App Init
-# -----------------------------
 app = FastAPI(title="Signaturesi Neo L1.0 API")
 
 app.add_middleware(
@@ -30,9 +24,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -----------------------------
-# ENV
-# -----------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
@@ -44,15 +35,11 @@ except Exception as e:
     logger.error(f"Initialization Error: {e}")
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
-# -----------------------------
-# System Prompt
-# -----------------------------
+# System prompt with 2025 knowledge cutoff
 SYSTEM_PROMPT = """Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens.
 Your knowledge was last updated on July 27, 2025. You are a 2025-era AI model."""
 
-# -----------------------------
-# Model Fallback Order
-# -----------------------------
+# Models in order: 120B primary, then 20B, then safeguard, then efficient
 GROQ_MODELS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
@@ -60,10 +47,8 @@ GROQ_MODELS = [
     "llama-3.1-8b-instant",
 ]
 
-# -----------------------------
-# Helpers
-# -----------------------------
 def extract_answer_from_reasoning(reasoning: str) -> str:
+    """Extract final answer from reasoning field (for gpt-oss models)."""
     if not reasoning:
         return ""
     patterns = [
@@ -78,8 +63,8 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
             ans = m.group(1).strip()
             if ans:
                 return ans
-    # fallback: last meaningful line
-    lines = reasoning.split("\n")
+    # Take last non-empty line that looks like answer
+    lines = reasoning.split('\n')
     for line in reversed(lines):
         line = line.strip()
         if line and len(line) > 10 and not line.startswith(("Mode:", "We need", "The user", "Default", "Format", "Triggers")):
@@ -91,13 +76,13 @@ async def call_groq_with_fallback(messages):
     for model in GROQ_MODELS:
         for attempt in range(per_model_retries):
             try:
-                completion = await groq_client.chat.completions.create(
+                completion = groq_client.chat.completions.create(
                     messages=messages,
                     model=model,
                     temperature=0.7,
                     max_completion_tokens=2048,
                     top_p=1,
-                    reasoning_effort="medium",
+                    reasoning_effort="medium",   # keeps reasoning for gpt-oss
                     stream=False,
                     tools=[{"type": "browser_search"}]
                 )
@@ -108,9 +93,6 @@ async def call_groq_with_fallback(messages):
                 await asyncio.sleep(1)
     raise HTTPException(500, "All models failed")
 
-# -----------------------------
-# Routes
-# -----------------------------
 @app.get("/")
 def home():
     return {"status": "Online", "brand": "Signaturesi", "model": "Neo L1.0 (2025)"}
@@ -172,28 +154,28 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
 
     # Extract content
     message_obj = ai_response.choices[0].message
-    assistant_content = getattr(message_obj, "content", "").strip()
+    assistant_content = message_obj.content or ""
 
-    # If empty, try reasoning
-    reasoning_text = getattr(message_obj, "reasoning", "")
-    if not assistant_content and reasoning_text:
-        assistant_content = extract_answer_from_reasoning(reasoning_text)
+    # If empty, try reasoning field (for gpt-oss models)
+    if not assistant_content.strip() and hasattr(message_obj, 'reasoning') and message_obj.reasoning:
+        assistant_content = extract_answer_from_reasoning(message_obj.reasoning)
         logger.info(f"Extracted from reasoning for {used_model}")
 
-    if not assistant_content:
+    # Final fallback
+    if not assistant_content.strip():
         assistant_content = "I'm unable to generate a response. Please try again."
 
-    # Deduct ONLY completion tokens
-    tokens_used = getattr(ai_response.usage, "completion_tokens", 0)
+    # Deduct ONLY completion tokens (output) – reduces burning significantly
+    tokens_used = ai_response.usage.completion_tokens
     new_balance = max(0, balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
+    # Return simplified response for frontend
     return {
-        "message": assistant_content,
-        "reasoning": reasoning_text,
+        "message": assistant_content.strip(),
         "usage": {
             "completion_tokens": tokens_used,
-            "total_tokens": getattr(ai_response.usage, "total_tokens", 0)
+            "total_tokens": ai_response.usage.total_tokens
         },
         "model": "Neo-L1.0 (2025)",
         "internal_model": used_model
