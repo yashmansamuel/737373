@@ -35,22 +35,20 @@ except Exception as e:
     logger.error(f"Initialization Error: {e}")
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
+# Original system prompt (exactly as you wanted)
 SYSTEM_PROMPT = "Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens."
 
+# Three models in order: primary (reasoning), fallback (reasoning), efficient (no reasoning)
 GROQ_MODELS = [
     "openai/gpt-oss-20b",
     "openai/gpt-oss-safeguard-20b",
+    "llama-3.1-8b-instant",
 ]
 
-def extract_final_answer_from_reasoning(reasoning_text: str) -> str:
-    """
-    Try to extract the actual answer from the model's reasoning field.
-    The reasoning usually ends with the answer after phrases like 'So we answer:' or 'Final:' or just the last sentence.
-    """
-    if not reasoning_text:
-        return "No response generated."
-    
-    # Look for patterns like "So we answer: ..." or "Final answer: ..."
+def extract_answer_from_reasoning(reasoning: str) -> str:
+    """Extract final answer from reasoning text (for first two models)."""
+    if not reasoning:
+        return ""
     patterns = [
         r"So (?:we )?answer:?\s*(.+?)(?:\n\n|$)",
         r"Final (?:answer|output):?\s*(.+?)(?:\n\n|$)",
@@ -58,24 +56,20 @@ def extract_final_answer_from_reasoning(reasoning_text: str) -> str:
         r"Therefore,?\s*(.+?)(?:\n\n|$)",
     ]
     for pat in patterns:
-        match = re.search(pat, reasoning_text, re.IGNORECASE | re.DOTALL)
-        if match:
-            return match.group(1).strip()
-    
-    # If no pattern, take the last sentence or bullet list after the last "."
-    # Split by newlines and find the last non-empty line that looks like an answer
-    lines = reasoning_text.split('\n')
+        m = re.search(pat, reasoning, re.IGNORECASE | re.DOTALL)
+        if m:
+            return m.group(1).strip()
+    # Take last bullet or sentence
+    lines = reasoning.split('\n')
     for line in reversed(lines):
         line = line.strip()
         if line and not line.startswith(("Mode:", "We need", "The user", "Default", "Format", "Triggers")):
-            # Check if it contains bullet or sentence-like structure
             if re.match(r'^[\*\-\•]|^[A-Z0-9]', line) or len(line) > 10:
                 return line
-    
-    # Fallback: return last 200 chars
-    return reasoning_text[-200:].strip()
+    return reasoning[-200:].strip()
 
 async def call_groq_with_fallback(messages):
+    """Try each model with retries, return first successful response."""
     per_model_retries = 2
     for model in GROQ_MODELS:
         for attempt in range(per_model_retries):
@@ -84,16 +78,17 @@ async def call_groq_with_fallback(messages):
                     messages=messages,
                     model=model,
                     temperature=0.7,
-                    max_completion_tokens=200,   # enough for reasoning + short answer
+                    max_completion_tokens=150,   # enough for both reasoning and answer
                     top_p=1,
                     stream=False,
                 )
-                logger.info(f"Success with model {model}")
-                return completion
+                logger.info(f"Success with model {model} on attempt {attempt+1}")
+                return completion, model
             except Exception as e:
                 logger.warning(f"Model {model}, attempt {attempt+1} failed: {e}")
                 await asyncio.sleep(1)
-    raise HTTPException(status_code=500, detail="All Groq models failed")
+        logger.warning(f"Model {model} failed after {per_model_retries} attempts, switching.")
+    raise HTTPException(status_code=500, detail="All models failed")
 
 @app.get("/")
 def home():
@@ -130,10 +125,12 @@ async def generate_key(request: Request):
 
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
+    # 1. Validate API key
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing API Key")
     user_api_key = authorization.replace("Bearer ", "")
 
+    # 2. Parse and validate request
     body = await request.json()
     if body.get("model") != "Neo-L1.0":
         raise HTTPException(status_code=400, detail="Invalid model. Use 'Neo-L1.0'")
@@ -141,7 +138,7 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     if not user_messages or not isinstance(user_messages, list):
         raise HTTPException(status_code=400, detail="Missing or invalid 'messages' array")
 
-    # Check balance
+    # 3. Check user balance
     try:
         response = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
         if not response.data:
@@ -153,29 +150,34 @@ async def chat_proxy(request: Request, authorization: str = Header(None)):
     if current_balance <= 0:
         raise HTTPException(status_code=402, detail="Insufficient Balance")
 
+    # 4. Call Groq with fallback across three models
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
-    ai_response = await call_groq_with_fallback(messages_for_groq)
+    ai_response, used_model = await call_groq_with_fallback(messages_for_groq)
 
+    # 5. Extract assistant content
     message_obj = ai_response.choices[0].message
     assistant_content = message_obj.content or ""
-    
-    # If content is empty, extract from reasoning
+
+    # For reasoning models (first two), if content empty, extract from reasoning
     if not assistant_content.strip() and hasattr(message_obj, 'reasoning') and message_obj.reasoning:
-        assistant_content = extract_final_answer_from_reasoning(message_obj.reasoning)
-        logger.info(f"Extracted answer from reasoning: {assistant_content[:100]}")
-    
+        assistant_content = extract_answer_from_reasoning(message_obj.reasoning)
+        logger.info(f"Extracted answer from reasoning for model {used_model}")
+
     if not assistant_content.strip():
         assistant_content = "I'm unable to generate a response. Please try again."
 
+    # 6. Deduct only completion tokens
     tokens_used = ai_response.usage.completion_tokens
     new_balance = max(0, current_balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
+    # 7. Return simplified response
     return {
         "message": assistant_content,
         "usage": {
             "completion_tokens": tokens_used,
             "total_tokens": ai_response.usage.total_tokens
         },
-        "model": "Neo-L1.0"
+        "model": "Neo-L1.0",
+        "internal_model": used_model   # optional, for debugging
     }
