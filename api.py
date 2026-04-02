@@ -35,71 +35,36 @@ except Exception as e:
     logger.error(f"Initialization Error: {e}")
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
-# Improved system prompt: explicitly ask for final answer in 'content'
-SYSTEM_PROMPT = """Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. 
-Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens.
-IMPORTANT: You are an AI trained until July 27, 2025. Always put your final answer in the 'content' field, not only in reasoning."""
+SYSTEM_PROMPT = """Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens.
+Your knowledge was last updated on July 27, 2025. You are a 2025-era AI model."""
 
-# Three models in order: 120B (primary) → 20B → efficient fallback
+# Three models: 120B (primary) -> 20B (fallback) -> efficient (last resort)
 GROQ_MODELS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-    "llama-3.1-8b-instant",   # This model never returns empty content
+    "llama-3.1-8b-instant",
 ]
 
-def extract_answer_from_response(message_obj) -> str:
-    """Try multiple ways to get the assistant's answer."""
-    # 1. Direct content
-    if hasattr(message_obj, 'content') and message_obj.content and message_obj.content.strip():
-        return message_obj.content.strip()
-    
-    # 2. Reasoning field (for gpt-oss models)
-    if hasattr(message_obj, 'reasoning') and message_obj.reasoning:
-        reasoning = message_obj.reasoning
-        # Try to extract final answer using patterns
-        patterns = [
-            r"(?:So|Therefore|Thus),?\s*(?:we )?answer:?\s*(.+?)(?:\n\n|$)",
-            r"Final (?:answer|output):?\s*(.+?)(?:\n\n|$)",
-            r"Output:?\s*(.+?)(?:\n\n|$)",
-            r"(?:•|\*|\-)\s*(.+?)(?=\n(?:•|\*|\-)|$)",
-        ]
-        for pat in patterns:
-            m = re.search(pat, reasoning, re.IGNORECASE | re.DOTALL)
-            if m:
-                ans = m.group(1).strip()
-                if ans:
-                    return ans
-        # If no pattern matches, take the last non-empty line that looks like an answer
-        lines = reasoning.split('\n')
-        for line in reversed(lines):
-            line = line.strip()
-            if line and len(line) > 10 and not line.startswith(("Mode:", "We need", "The user", "Default", "Format", "Triggers", "IMPORTANT")):
-                return line
-        # Fallback: return the whole reasoning truncated
-        return reasoning[:300].strip()
-    
-    # 3. If message_obj has a 'text' attribute (some models)
-    if hasattr(message_obj, 'text') and message_obj.text:
-        return message_obj.text.strip()
-    
-    # 4. Last resort
-    logger.error(f"Could not extract answer from message_obj: {message_obj}")
-    return None
-
 async def call_groq_with_fallback(messages):
-    """Try each model with retries, return (completion, model_name)."""
+    """Try each model with reasoning_effort='none' for the first two."""
     per_model_retries = 2
     for model in GROQ_MODELS:
         for attempt in range(per_model_retries):
             try:
-                completion = groq_client.chat.completions.create(
-                    messages=messages,
-                    model=model,
-                    temperature=0.7,
-                    max_completion_tokens=300,   # Increased to avoid truncation
-                    top_p=1,
-                    stream=False,
-                )
+                # Common parameters
+                kwargs = {
+                    "messages": messages,
+                    "model": model,
+                    "temperature": 0.7,
+                    "max_completion_tokens": 200,
+                    "top_p": 1,
+                    "stream": False,
+                }
+                # Add reasoning_effort only for gpt-oss models
+                if "gpt-oss" in model:
+                    kwargs["reasoning_effort"] = "none"   # This disables reasoning!
+                
+                completion = groq_client.chat.completions.create(**kwargs)
                 logger.info(f"Success with model {model} on attempt {attempt+1}")
                 return completion, model
             except Exception as e:
@@ -110,85 +75,78 @@ async def call_groq_with_fallback(messages):
 
 @app.get("/")
 def home():
-    return {"status": "Online", "brand": "Signaturesi", "model": "Neo L1.0 (2025 Edition)"}
+    return {"status": "Online", "brand": "Signaturesi", "model": "Neo L1.0 (2025)"}
 
 @app.get("/v1/user/balance")
 def get_balance(api_key: str):
     try:
         response = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(status_code=404, detail="API Key not found")
-        balance = response.data[0].get("token_balance", 0)
-        return {"api_key": api_key, "balance": balance}
+        if not response.data:
+            raise HTTPException(404, "API Key not found")
+        return {"api_key": api_key, "balance": response.data[0]["token_balance"]}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Supabase Error: {e}")
-        raise HTTPException(status_code=500, detail="Database error")
+        raise HTTPException(500, "Database error")
 
 @app.post("/v1/user/new-key")
 async def generate_key(request: Request):
     new_key = "sig-live-" + secrets.token_urlsafe(16)
-    user_country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
+    country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
     try:
-        supabase.table("users").insert({
-            "api_key": new_key,
-            "token_balance": 1000,
-            "country": user_country
-        }).execute()
-        return {"api_key": new_key, "balance": 1000, "country": user_country}
+        supabase.table("users").insert({"api_key": new_key, "token_balance": 1000, "country": country}).execute()
+        return {"api_key": new_key, "balance": 1000, "country": country}
     except Exception as e:
-        logger.error(f"Supabase Insert Error: {e}")
-        raise HTTPException(status_code=500, detail="Cannot create new API key")
+        logger.error(f"Insert Error: {e}")
+        raise HTTPException(500, "Cannot create key")
 
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
-    # 1. Validate API key
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing API Key")
+        raise HTTPException(401, "Missing API Key")
     user_api_key = authorization.replace("Bearer ", "")
 
-    # 2. Parse request
     body = await request.json()
     if body.get("model") != "Neo-L1.0":
-        raise HTTPException(status_code=400, detail="Invalid model. Use 'Neo-L1.0'")
+        raise HTTPException(400, "Invalid model. Use 'Neo-L1.0'")
     user_messages = body.get("messages")
-    if not user_messages or not isinstance(user_messages, list):
-        raise HTTPException(status_code=400, detail="Missing or invalid 'messages' array")
+    if not user_messages:
+        raise HTTPException(400, "Missing messages")
 
-    # 3. Check balance
+    # Check balance
     try:
-        response = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
-        if not response.data:
-            raise HTTPException(status_code=401, detail="Invalid API Key")
-        current_balance = response.data[0].get("token_balance", 0)
+        resp = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
+        if not resp.data:
+            raise HTTPException(401, "Invalid API Key")
+        balance = resp.data[0]["token_balance"]
+        if balance <= 0:
+            raise HTTPException(402, "Insufficient Balance")
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Supabase Error: {e}")
-        raise HTTPException(status_code=500, detail="Database error")
-    if current_balance <= 0:
-        raise HTTPException(status_code=402, detail="Insufficient Balance")
+        logger.error(f"Balance error: {e}")
+        raise HTTPException(500, "Database error")
 
-    # 4. Call Groq
+    # Prepare messages
     messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
     ai_response, used_model = await call_groq_with_fallback(messages_for_groq)
 
-    # 5. Extract answer robustly
-    message_obj = ai_response.choices[0].message
-    assistant_content = extract_answer_from_response(message_obj)
+    # Extract content – with reasoning_effort="none", it's always in content
+    assistant_content = ai_response.choices[0].message.content
+    if not assistant_content or not assistant_content.strip():
+        # Fallback: try to get from reasoning (should not happen, but safe)
+        if hasattr(ai_response.choices[0].message, 'reasoning'):
+            assistant_content = ai_response.choices[0].message.reasoning or "No response."
+        else:
+            assistant_content = "I'm unable to generate a response."
 
-    if assistant_content is None:
-        # Log the full response for debugging
-        logger.error(f"Failed to extract answer. Full response: {ai_response}")
-        assistant_content = "Sorry, I encountered an internal issue. Please try again."
-
-    # 6. Deduct tokens (only completion tokens)
     tokens_used = ai_response.usage.completion_tokens
-    new_balance = max(0, current_balance - tokens_used)
+    new_balance = max(0, balance - tokens_used)
     supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-    # 7. Return simplified response
     return {
-        "message": assistant_content,
+        "message": assistant_content.strip(),
         "usage": {
             "completion_tokens": tokens_used,
             "total_tokens": ai_response.usage.total_tokens
