@@ -41,20 +41,18 @@ SUPABASE: Client = create_client(
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # -----------------------------
-# Model fallback order
+# Model fallback order (Llama-3.1-8b eliminated as requested)
 # -----------------------------
 MODELS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-    "openai/gpt-oss-safeguard-20b",
-    "llama-3.1-8b-instant"
+    "openai/gpt-oss-safeguard-20b"
 ]
 
 # -----------------------------
-# System prompt (concise, safe)
+# System prompt (Ultra-Lean & Proprietary)
 # -----------------------------
-SYSTEM_PROMPT = """Mode: Neo-Concise. Triggers: [M]=Math, [C]=Code, [H]=Health, [G]=General.
-Format: ≤2 short sentences or 3 bullets. No intros/outros. Max 60 tokens."""
+SYSTEM_PROMPT = "Proprietary Neo-Concise 2025. Triggers: [M,C,S,G]. Mode: Multi-Expert. Rule: ≤2 sentences or 3 bullets. No fillers. Direct lethal output only."
 
 # -----------------------------
 # Pydantic models
@@ -106,13 +104,13 @@ async def call_ai_with_fallback(messages: List[dict]) -> Tuple[object, str]:
             kwargs = {
                 "model": model,
                 "messages": messages,
-                "temperature": 0.7,
-                "max_completion_tokens": 1500,
+                "temperature": 0.3, # Lowered for more precise/concise output
+                "max_completion_tokens": 150, # Capped to save tokens
                 "stream": False,
             }
-            if "gpt-oss" in model:
-                kwargs["reasoning_effort"] = "medium"
-                kwargs["tools"] = [{"type": "browser_search"}]
+            # All remaining models are gpt-oss based
+            kwargs["reasoning_effort"] = "medium"
+            kwargs["tools"] = [{"type": "browser_search"}]
 
             completion = GROQ.chat.completions.create(**kwargs)
             logger.info(f"Success with model {model}")
@@ -180,7 +178,8 @@ async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)
     if not final_answer:
         final_answer = "Unable to respond. Please try again."
 
-    tokens_used = ai_response.usage.completion_tokens
+    # Multiplier set for $1.20 pricing model (adjusted for 20B logic)
+    tokens_used = ai_response.usage.total_tokens
     new_balance = max(0, balance - tokens_used)
 
     asyncio.create_task(
@@ -192,7 +191,7 @@ async def neo_chat_proxy(payload: ChatRequest, authorization: str = Header(None)
     return {
         "id": f"neo_{secrets.token_hex(6)}",
         "message": final_answer,
-        "usage": {"completion_tokens": tokens_used, "total_tokens": ai_response.usage.total_tokens},
+        "usage": {"completion_tokens": ai_response.usage.completion_tokens, "total_tokens": tokens_used},
         "model_engine": "Neo-L1.0",
         "provider": "Signaturesi",
         "internal_model": used_model
