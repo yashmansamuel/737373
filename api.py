@@ -1,5 +1,6 @@
 import os
 import logging
+import secrets
 import re
 import asyncio
 from fastapi import FastAPI, Request, HTTPException, Header
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # App Init
 # -----------------------------
-app = FastAPI(title="Signaturesi Neo L1.0 API v4")
+app = FastAPI(title="Signaturesi Neo L1.0 API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,12 +45,23 @@ except Exception as e:
     raise RuntimeError("Cannot connect to Supabase or Groq")
 
 # -----------------------------
-# SYSTEM PROMPT
+# System Prompt
 # -----------------------------
-SYSTEM_PROMPT = "Short answers only. Max 60 tokens. Knowledge cutoff: July 2025."
+SYSTEM_PROMPT = """Mode: Think. Triggers: [M]=MathHints, [C]=CodeSnippet, [H]=Health, [G]=General. Default:[G]. Format: ≤2 telegraphic sentences or 3 short bullets. No intro/outro/tags. Max 60 tokens.
+Your knowledge was last updated on July 27, 2025. You are a 2025-era AI model."""
 
 # -----------------------------
-# HELPERS
+# Model Fallback Order
+# -----------------------------
+GROQ_MODELS = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-safeguard-20b",
+    "llama-3.1-8b-instant",
+]
+
+# -----------------------------
+# Helpers
 # -----------------------------
 def extract_answer_from_reasoning(reasoning: str) -> str:
     if not reasoning:
@@ -66,153 +78,123 @@ def extract_answer_from_reasoning(reasoning: str) -> str:
             ans = m.group(1).strip()
             if ans:
                 return ans
-    # fallback
-    lines = reasoning.split('\n')
+    # fallback: last meaningful line
+    lines = reasoning.split("\n")
     for line in reversed(lines):
         line = line.strip()
-        if line and len(line) > 10:
+        if line and len(line) > 10 and not line.startswith(("Mode:", "We need", "The user", "Default", "Format", "Triggers")):
             return line
     return reasoning[:200].strip()
 
-
-def should_use_search(messages):
-    text = messages[-1]["content"].lower()
-    keywords = ["latest", "current", "news", "today", "price", "2026"]
-    return any(k in text for k in keywords)
-
-
-def pick_model(messages):
-    text = messages[-1]["content"].lower()
-    if len(text) < 80:
-        return "llama-3.1-8b-instant"
-    elif "code" in text or "python" in text:
-        return "openai/gpt-oss-20b"
-    else:
-        return "openai/gpt-oss-120b"
-
-
-def get_reasoning_effort(messages):
-    text = messages[-1]["content"].lower()
-    if len(text) < 50:
-        return "none"
-    elif "code" in text:
-        return "medium"
-    else:
-        return "low"
-
-# -----------------------------
-# GROQ CALL
-# -----------------------------
-async def call_groq(messages):
-    model = pick_model(messages)
-    tools = [{"type": "browser_search"}] if should_use_search(messages) else []
-    reasoning_effort = get_reasoning_effort(messages)
-
-    try:
-        completion = await groq_client.chat.completions.create(
-            messages=messages,
-            model=model,
-            temperature=0.7,
-            max_completion_tokens=800,
-            top_p=1,
-            reasoning_effort=reasoning_effort,
-            stream=False,
-            tools=tools
-        )
-        return completion, model
-
-    except Exception as e:
-        logger.warning(f"Primary model failed: {e}")
-
-        fallback_models = [
-            "openai/gpt-oss-20b",
-            "openai/gpt-oss-safeguard-20b",
-            "llama-3.1-8b-instant"
-        ]
-
-        for fb_model in fallback_models:
+async def call_groq_with_fallback(messages):
+    per_model_retries = 2
+    for model in GROQ_MODELS:
+        for attempt in range(per_model_retries):
             try:
                 completion = await groq_client.chat.completions.create(
                     messages=messages,
-                    model=fb_model,
+                    model=model,
                     temperature=0.7,
-                    max_completion_tokens=800,
+                    max_completion_tokens=2048,
                     top_p=1,
-                    reasoning_effort=reasoning_effort,
+                    reasoning_effort="medium",
                     stream=False,
-                    tools=tools
+                    tools=[{"type": "browser_search"}]
                 )
-                return completion, fb_model
-            except Exception as e2:
-                logger.warning(f"Fallback {fb_model} failed: {e2}")
-                await asyncio.sleep(0.5)
-
-        raise HTTPException(500, "All models failed")
+                logger.info(f"Success with model {model}")
+                return completion, model
+            except Exception as e:
+                logger.warning(f"Model {model}, attempt {attempt+1} failed: {e}")
+                await asyncio.sleep(1)
+    raise HTTPException(500, "All models failed")
 
 # -----------------------------
-# ROUTES
+# Routes
 # -----------------------------
 @app.get("/")
 def home():
-    return {"status": "Online", "model": "Neo L1.0 v4"}
+    return {"status": "Online", "brand": "Signaturesi", "model": "Neo L1.0 (2025)"}
+
+@app.get("/v1/user/balance")
+def get_balance(api_key: str):
+    try:
+        resp = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
+        if not resp.data:
+            raise HTTPException(404, "API Key not found")
+        return {"api_key": api_key, "balance": resp.data[0]["token_balance"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supabase Error: {e}")
+        raise HTTPException(500, "Database error")
+
+@app.post("/v1/user/new-key")
+async def generate_key(request: Request):
+    new_key = "sig-live-" + secrets.token_urlsafe(16)
+    country = request.headers.get("x-vercel-ip-country") or request.headers.get("cf-ipcountry") or "Unknown"
+    try:
+        supabase.table("users").insert({"api_key": new_key, "token_balance": 1000, "country": country}).execute()
+        return {"api_key": new_key, "balance": 1000, "country": country}
+    except Exception as e:
+        logger.error(f"Insert Error: {e}")
+        raise HTTPException(500, "Cannot create key")
 
 @app.post("/v1/chat/completions")
 async def chat_proxy(request: Request, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing API Key")
+    user_api_key = authorization.replace("Bearer ", "")
 
-    api_key = authorization.replace("Bearer ", "")
     body = await request.json()
-
     if body.get("model") != "Neo-L1.0":
-        raise HTTPException(400, "Invalid model")
+        raise HTTPException(400, "Invalid model. Use 'Neo-L1.0'")
+    user_messages = body.get("messages")
+    if not user_messages:
+        raise HTTPException(400, "Missing messages")
 
-    messages = body.get("messages")
-    if not messages:
-        raise HTTPException(400, "Messages missing")
+    # Check balance
+    try:
+        resp = supabase.table("users").select("token_balance").eq("api_key", user_api_key).execute()
+        if not resp.data:
+            raise HTTPException(401, "Invalid API Key")
+        balance = resp.data[0]["token_balance"]
+        if balance <= 0:
+            raise HTTPException(402, "Insufficient Balance")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Balance error: {e}")
+        raise HTTPException(500, "Database error")
 
-    # -----------------------------
-    # BALANCE CHECK
-    # -----------------------------
-    resp = supabase.table("users").select("token_balance").eq("api_key", api_key).execute()
-    if not resp.data:
-        raise HTTPException(401, "Invalid API Key")
+    # Prepare messages
+    messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + user_messages
+    ai_response, used_model = await call_groq_with_fallback(messages_for_groq)
 
-    balance = resp.data[0]["token_balance"]
-    if balance <= 0:
-        raise HTTPException(402, "Insufficient Balance")
-
-    # -----------------------------
-    # AI CALL
-    # -----------------------------
-    messages_for_groq = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
-    ai_response, used_model = await call_groq(messages_for_groq)
-
+    # Extract content
     message_obj = ai_response.choices[0].message
-    assistant_content = getattr(message_obj, 'content', '')
+    assistant_content = getattr(message_obj, "content", "").strip()
 
-    reasoning_text = getattr(message_obj, 'reasoning', '')
-    reasoning_text = extract_answer_from_reasoning(reasoning_text)
+    # If empty, try reasoning
+    reasoning_text = getattr(message_obj, "reasoning", "")
+    if not assistant_content and reasoning_text:
+        assistant_content = extract_answer_from_reasoning(reasoning_text)
+        logger.info(f"Extracted from reasoning for {used_model}")
 
-    if not assistant_content.strip():
-        assistant_content = reasoning_text or "No response generated."
+    if not assistant_content:
+        assistant_content = "I'm unable to generate a response. Please try again."
 
-    # -----------------------------
-    # TOKEN LOGIC
-    # -----------------------------
-    total_tokens = getattr(ai_response.usage, 'total_tokens', 0)
-    tokens_charged = int(total_tokens * 1.15)
+    # Deduct ONLY completion tokens
+    tokens_used = getattr(ai_response.usage, "completion_tokens", 0)
+    new_balance = max(0, balance - tokens_used)
+    supabase.table("users").update({"token_balance": new_balance}).eq("api_key", user_api_key).execute()
 
-    new_balance = max(0, balance - tokens_charged)
-    supabase.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
-
-    # -----------------------------
-    # RESPONSE
-    # -----------------------------
     return {
-        "message": assistant_content.strip(),
+        "message": assistant_content,
         "reasoning": reasoning_text,
-        "usage": {"total_tokens": tokens_charged},
-        "model": "Neo-L1.0",
+        "usage": {
+            "completion_tokens": tokens_used,
+            "total_tokens": getattr(ai_response.usage, "total_tokens", 0)
+        },
+        "model": "Neo-L1.0 (2025)",
         "internal_model": used_model
     }
