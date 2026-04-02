@@ -108,8 +108,11 @@ async def apex_chat_proxy(payload: ChatRequest, authorization: str = Header(None
 
     # 2. Execute AI Hunt
     system_prompt = {
-        "role": "system", 
-        "content": "Mode: Think. Triggers: [M]=Math, [C]=Code, [G]=Gen. Format: ≤2 sentences or 3 bullets. Max 60 tokens. Knowledge: July 2025."
+        "role": "system",
+        "content": (
+            "Proprietary Neo-Concise 2025. Triggers: [M]Math, [C]Code, [S]Search, [G]Gen. "
+            "Mode: Multi-Expert. Rule: ≤2 sentences or 3 bullets. No fillers. Direct lethal output only."
+        )
     }
     final_messages = [system_prompt] + payload.messages
     
@@ -120,7 +123,6 @@ async def apex_chat_proxy(payload: ChatRequest, authorization: str = Header(None
     tokens = ai_response.usage.completion_tokens
 
     # 4. 🔥 SHARK MOVE: Async Balance Update (Zero Latency)
-    # User gets response NOW, DB updates in background
     asyncio.create_task(asyncio.to_thread(
         SUPABASE.table("users").update({"token_balance": max(0, current_balance - tokens)}).eq("api_key", api_key).execute
     ))
@@ -139,7 +141,7 @@ async def generate_apex_key(request: Request):
     country = request.headers.get("cf-ipcountry", "Global")
     SUPABASE.table("users").insert({
         "api_key": new_key, 
-        "token_balance": 2000, # Apex bonus
+        "token_balance": 2000,  # Apex bonus
         "country": country
     }).execute()
     return {"api_key": new_key, "balance": 2000, "status": "Apex Active"}
