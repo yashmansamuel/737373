@@ -2,18 +2,18 @@
 definition AI SaaS platform that automates content generation and chatbot responses
 features Multi-model support, Fast responses, API access, Low-cost pricing
 pricing Basic: $10/month for 100k tokens, Pro: $25/month for 500k tokens
-examples Small startups use Basic, Enterprises use Pro for high-volume queries
+examples Startups use Basic plan, Enterprises use Pro plan for high-volume queries
 rule Always answer based only on these facts
 rule Do not hallucinate if information is missing
 
 [topic] support
-email support@yourapp.com
+email support@signaturesi.com
 response_time 24 hours
 help_docs Available online at https://neo.signaturesi.com/docs
 rule Always provide support contact from this section
 rule Never invent support info
 
-[topic] coding
+[topic] programming
 languages Python, JavaScript, FastAPI
 purpose Backend API, AI integration, Automation
 rule Answer only with listed languages and purposes
@@ -23,7 +23,30 @@ example How to send a message via API
 example How to check token balance programmatically
 rule Always include API usage examples when asked
 
+[topic] documentation
+url https://neo.signaturesi.com/docs
+description Full API and usage documentation for Neo L1.0
+rule Answer questions about docs only using this info
+rule Do not try to summarize or access external content
+
 [topic] pricing
 plans Basic, Pro
-cost Basic: 10$/100k tokens, Pro: 25$/500k tokens
+cost Basic: $10/month for 100k tokens, Pro: $25/month for 500k tokens
 rule Always use these values for pricing questions
+
+[topic] features
+list API access, Multi-model support, Fast response times, Low-cost pricing
+rule Always mention these features when asked
+
+[topic] brand
+website https://neo.signaturesi.com/
+company Signaturesi
+rule Only provide company info from this topic
+rule Do not guess other domains
+
+[topic] faq
+question "How can I check my token balance?"
+answer "Use the API endpoint /v1/user/balance with your API key."
+question "How do I generate a new API key?"
+answer "Use the API endpoint /v1/user/new-key to create a key."
+rule Always provide exact answers from this topic for FAQs
