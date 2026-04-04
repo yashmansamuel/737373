@@ -333,3 +333,79 @@ Competition and AI Race:
 
 Keywords: Gemini AI, Google DeepMind, multimodal AI, reasoning models, Gemini 2.5, Gemini 3, AI competition
 
+# Topic: AI Model Performance Metrics (Seconds & Efficiency)
+Definition: Metrics for evaluating large language models (LLMs) including throughput, latency, token/sec, and energy efficiency.
+Key Metrics:
+- Model Seconds: Time taken by a model to process one token or one batch (measured in seconds per token or seconds per 1000 tokens)
+- Tokens/sec: Number of tokens processed per second
+- Latency: Time from input query to output response
+- Throughput: Number of simultaneous requests a model can handle per second
+- Memory Footprint: GPU/CPU memory used during inference
+- Cost Efficiency: Model seconds vs output quality / tokens generated
+
+Example Model Benchmarks (2025–2026):
+- GPT-5.2 Pro: ~0.003 sec/token (batch=1, 8x A100 GPU), ~330 tokens/sec, high reasoning quality
+- GPT-5.4 Mini: ~0.0015 sec/token (batch=1, 1x A100), ~670 tokens/sec, lightweight reasoning
+- Google Gemini 3 Flash: ~0.002 sec/token (batch=1, TPU v5), ~500 tokens/sec, multimodal reasoning
+- GPT-5.3-Codex: ~0.004 sec/token (batch=1, optimized for coding tasks), ~250 tokens/sec, high accuracy
+- LLaMA 4-Scout 17B: ~0.005 sec/token (batch=1), ~200 tokens/sec, high-density reasoning
+
+Advanced Reasoning Techniques:
+- Adaptive Token Scheduling: Dynamically allocate computation for important tokens first
+- Stepwise Compression: Reduce multi-step reasoning to fewer tokens while retaining correctness
+- Parallel Candidate Evaluation: Evaluate multiple hypotheses simultaneously, reduce model seconds per valid answer
+- Load Balancing Across GPUs/TPUs: Optimize throughput for batch queries
+- Real-Time Cost Estimation: Calculate remaining token budget vs seconds spent
+
+Use Cases:
+- Real-time chat systems: Ensure latency < 0.5s per message
+- Large document summarization: Use model seconds metrics to estimate processing time
+- RAG pipelines: Combine retrieval with inference while respecting token/sec constraints
+- AI experimentation: Compare models by seconds/token, throughput, and memory for efficiency decisions
+
+Keywords: model seconds, latency, throughput, tokens per second, real-time AI, efficiency metrics, benchmark
+# Topic: Frontier AI Models 2025–2026
+Summary: In 2025–2026, the pace of AI model releases accelerated dramatically. Major labs (OpenAI, Google DeepMind, Anthropic, xAI, Mistral, Zhipu, ByteDance) introduced frontier models with large context windows, agentic reasoning, multimodal abilities, and cost/efficiency innovations. Benchmarks now emphasize real reasoning, long‑context comprehension, coding, and tool use rather than just parameter count. ([turn0search0][turn0search1])
+
+OpenAI GPT‑5.3 and 5.4 Family:
+• GPT‑5.3‑Codex (Feb 2026) — coding and structured reasoning focus; faster and higher scores on developer workflows.  
+• GPT‑5.4 (Mar 5, 2026) — million‑token context support, dynamic tool search, improved accuracy & lower latency than GPT‑5.2.  
+Variants: Standard / Thinking (reasoning optimized) / Pro (max capability).  
+Keywords: GPT‑5.3, GPT‑5.4, Codex, context window, reasoning benchmarks. ([turn0search0][turn0search8])
+
+Google Gemini & Gemma:
+• Gemini 3.1 Pro (Feb–Mar 2026) — state‑of‑the‑art multimodal reasoning, 1M+ token window, strong in large document and video/text tasks.  
+• Gemini 3.5 Flash — ultra‑fast multimodal model; native video input/output in API and app.  
+• Gemma 4 (Apr 2026) — new open series optimized for mobile & data center efficiency, democratizing model access.  
+Keywords: Gemini 3.1, Gemini 3.5 Flash, Gemma 4, multimodal AI, reasoning performance. ([turn0news22][turn0news23])
+
+Claude (Anthropic):
+• Claude Opus 4.6 (Feb 2026) — strong coding & agent workflows, improved reliability, 1M token context beta.  
+• Claude Sonnet 4.5/4.6 — high reasoning, extended planning, world‑class coding benchmarks; promoted for autonomous multi‑step tasks.  
+Keywords: Claude 4.6, Claude Sonnet, agentic AI, long document reasoning. ([turn0news29][turn0news32][turn0search6])
+
+xAI *Grok* Series:
+• Grok 4.2 / 4.20 Beta — faster inference, improved vision & real‑time search integration.  
+• Grok 4.1 / Grok 4 — moderate token windows with integrated tool pipelines (Web/X search, execution).  
+Keywords: Grok 4, real‑time data, web search, vision multimodality. ([turn0search2][turn0search10])
+
+Open‑Source & Competitors:
+• Mistral Large 3 — large open model with Mix‑of‑Experts (MoE) architecture.  
+• Zhipu GLM‑5 — flagship open‑source model optimized for coding and long workflows.  
+• MiniMax M2.5 — efficient MoE with strong coding benchmarks and cost advantage.  
+• Qwen 3 Series — Alibaba’s commercial AI series with well‑rounded performance.  
+• DeepSeek V3.2/V4 — large context and multimodal ambitions; focus on cost‑efficient CLI & API deployments.  
+• LLaMA 4 Maverick — Meta’s foundational open model with large context support.  
+Keywords: open‑source models, MoE, efficient AI, Zhipu, Mistral, Qwen, DeepSeek, LLaMA 4. ([turn0search1][turn0search3][turn0reddit60])
+
+Competition Dynamics:
+• Microsoft’s “Copilot Cowork” combines GPT & Claude critique loops for quality responses.  
+• Benchmarks now focus on *reasoning, safety, tool use*, not just parameter size.  
+• Specialized models (o3‑mini/pro, Gemini Flash variants) target latency & efficiency at scale.  
+Keywords: AI competition, model critique, multi‑agent, reasoning benchmarks. ([turn0news20][turn0news21])
+
+Context Windows & Task Specialization:
+• Long contexts (1M+ tokens) are mainstream — enabling large document understanding, summarization, and agent workflows.  
+• Agentic AI — models plan, execute, and iterate autonomously on multi‑step tasks.  
+Keywords: context window, agentic AI, workflow automation.
+
