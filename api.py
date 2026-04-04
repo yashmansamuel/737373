@@ -50,12 +50,7 @@ MODELS = [
     "llama-3.3-70b-versatile"
 ]
 
-SYSTEM_PROMPT = """You are a High-Density Information Engine. 
-Your goal is to process massive topics and compress them into a maximum of 4,000 tokens. 
-Strict Rule: Eliminate all introductory filler, repetitive adjectives, and polite transitions. 
-Provide only high-entropy data, deep technical insights, and core logic. 
-If the topic is vast, use hierarchical bullet points to maintain depth while saving tokens.
-"""
+SYSTEM_PROMPT = "High-Density Info Engine. Compress topics into 4000 tokens. No filler. Provide core logic and deep insights. Use hierarchical bullets for large topics."
 
 # -----------------------------
 # 3. Pydantic Models
@@ -175,23 +170,44 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         raise HTTPException(402, "No tokens left")
 
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
-    local_data = get_neo_knowledge(user_msg)
+    
+    # --- Greeting shortcut ---
+    if user_msg.lower() in ["hi", "hello", "hey"]:
+        return {
+            "company": "signaturesi.com",
+            "final_answer": "Hello! How can I assist you today?",
+            "reasoning": "",
+            "usage": {"total_tokens": 0, "reasoning_tokens": 0},
+            "model": "Neo L1.0",
+            "internal_engine": "shortcut",
+            "balance": balance
+        }
 
+    # --- Knowledge / RAG ---
+    local_data = get_neo_knowledge(user_msg) if len(user_msg.split()) > 5 else ""
+
+    # --- Build messages ---
     final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
     final_messages.extend(payload.messages)
 
-    for model_name in MODELS:
+    # --- Select models based on query length ---
+    models_to_use = MODELS.copy()
+    if len(user_msg) < 5:
+        models_to_use = ["openai/gpt-oss-20b"]  # smaller model for tiny queries
+
+    for model_name in models_to_use:
         try:
+            max_tokens = min(3000, len(user_msg.split())*20 + 200)
+
             response = GROQ.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
                 temperature=0.6,
-                max_tokens=3000
+                max_tokens=max_tokens
             )
 
-            # Return both final answer and reasoning
             message_obj = response.choices[0].message
             final_answer = getattr(message_obj, "content", "")
             reasoning = getattr(message_obj, "reasoning", "")
@@ -200,6 +216,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             reasoning_tokens = getattr(response.usage, "prompt_tokens", 0)
             new_balance = max(0, balance - total_tokens)
 
+            # Async update token balance
             asyncio.create_task(asyncio.to_thread(
                 lambda: SUPABASE.table("users")
                 .update({"token_balance": new_balance})
