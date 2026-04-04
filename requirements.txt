@@ -1,6 +1,6 @@
-fastapi==0.111.1
-uvicorn==0.26.1
-python-dotenv==1.0.0
-supabase==2.3.0
-groq==0.1.15
-pydantic==2.2.0
+fastapi
+uvicorn
+python-dotenv
+supabase
+groq
+pydantic
