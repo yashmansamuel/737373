@@ -19,7 +19,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Neo-L1.0-Core")
 
-# Check required environment variables
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
 for var in required_vars:
     if not os.getenv(var):
@@ -189,15 +188,18 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
                 model=model_name,
                 messages=final_messages,
                 temperature=0.6,
-                max_tokens=3000  # HARD TOKEN LIMIT
+                max_tokens=3000
             )
 
-            reply = extract_content(response.choices[0].message)
+            # Return both final answer and reasoning
+            message_obj = response.choices[0].message
+            final_answer = getattr(message_obj, "content", "")
+            reasoning = getattr(message_obj, "reasoning", "")
+
             total_tokens = getattr(response.usage, "total_tokens", 0)
             reasoning_tokens = getattr(response.usage, "prompt_tokens", 0)
             new_balance = max(0, balance - total_tokens)
 
-            # Async balance update
             asyncio.create_task(asyncio.to_thread(
                 lambda: SUPABASE.table("users")
                 .update({"token_balance": new_balance})
@@ -207,7 +209,8 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
 
             return {
                 "company": "signaturesi.com",
-                "message": reply,
+                "final_answer": final_answer,
+                "reasoning": reasoning,
                 "usage": {
                     "total_tokens": total_tokens,
                     "reasoning_tokens": reasoning_tokens
