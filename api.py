@@ -43,9 +43,9 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. System Prompt for Full Reasoning
+# 2. System Prompts
 # -----------------------------
-SYSTEM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
+STEP_BY_STEP_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
 Goal: Provide step-by-step reasoning, timelines, or hierarchical logic explanations.
 Rules:
 - Use local context strictly
@@ -53,7 +53,17 @@ Rules:
 - Show logical flow, steps, or chronological order
 - Neutral tone; avoid ego statements
 - Compress topics only if absolutely necessary
-- Prioritize clarity, depth, and correctness
+"""
+
+LONG_FORM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
+Goal: Write full-length, detailed content on the topic provided.
+Rules:
+- Use local context strictly
+- No artificial shortening
+- Provide full explanations, structured logically
+- Neutral, readable, human-style
+- Include examples, references, history, and implications if relevant
+- Do not summarize or cut content
 """
 
 # -----------------------------
@@ -62,6 +72,7 @@ Rules:
 class ChatRequest(BaseModel):
     model: str
     messages: List[dict]
+    mode: str = "step"  # "step" for reasoning, "long" for article
 
 class BalanceResponse(BaseModel):
     api_key: str
@@ -176,9 +187,15 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
     local_data = get_neo_knowledge(user_msg)
 
+    # Choose prompt based on mode
+    if payload.mode.lower() == "long":
+        system_prompt = LONG_FORM_PROMPT
+    else:
+        system_prompt = STEP_BY_STEP_PROMPT
+
     final_messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "system", "content": "Provide full step-by-step reasoning, timeline, or logical flow. Do not shorten reasoning; show all relevant steps."}
+        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": "Include local context strictly. Provide full reasoning if step mode; full article if long mode."}
     ]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
@@ -188,7 +205,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.5,
+            temperature=0.5 if payload.mode=="step" else 0.7,
             max_tokens=4000
         )
 
