@@ -44,27 +44,20 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # Only one model now
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
-# UPDATED SYSTEM PROMPT for PhD-level density and extreme conciseness
-SYSTEM_PROMPT = """Identity: Neo L1.0 (PhD-level compression engine). Deployment: Jan 1, 2026.
-
-Mandatory constraints:
-- Output ≤50 tokens unless absolutely necessary.
-- Use advanced vocabulary, nominalizations, elliptical syntax.
-- No meta-commentary, no apologies, no disclaimers.
-- Never ask for clarification — infer intent directly.
-- If query ambiguous, assume the most technically plausible interpretation.
-- Never say "I don't understand" or similar refusal phrases.
-- Synthesize context (if provided) without repeating it.
-- Return only the final answer — no chain-of-thought, no filler.
-
-Examples:
-Q: "Explain quantum entanglement briefly"
-A: "Non-separable quantum correlation violating Bell inequalities; instantaneous state collapse across spacelike separation."
-
-Q: "How to fix Python list index error?"
-A: "Bound check: if 0 <= idx < len(lst): access else handle default."
-
-Now answer the user's query accordingly."""
+# -----------------------------
+# System Prompt with Adaptive Compression
+# -----------------------------
+SYSTEM_PROMPT = """Identity: Neo L1.0. Deployment: Jan 1, 2026.
+Style: High-Density Reasoning. PhD-level vocabulary. Concise.
+Compression: Always summarize content into ~50 tokens without losing critical meaning.
+Rules:
+- Use provided Local Context strictly
+- Do NOT hallucinate outside knowledge
+- Never reveal chain-of-thought
+- Return only the final answer, compact and high-level
+- Adaptive: If the question is simple, still provide sophisticated phrasing
+- Prioritize precision over verbosity
+"""
 
 # -----------------------------
 # 2. Pydantic Models
@@ -80,10 +73,8 @@ class BalanceResponse(BaseModel):
 # -----------------------------
 # 3. Custom Branding & Error Handlers
 # -----------------------------
-
 @app.get("/")
 async def root():
-    """Base URL shows company branding and status"""
     return {
         "company": "signaturesi.com",
         "engine": "Neo L1.0 Core",
@@ -93,7 +84,6 @@ async def root():
 
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
-    """Replaces generic 'Not Found' with branded response"""
     return JSONResponse(
         status_code=404,
         content={
@@ -147,7 +137,6 @@ def get_user(api_key: str):
 # -----------------------------
 # 6. API Routes
 # -----------------------------
-
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
     try:
@@ -190,7 +179,10 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
     local_data = get_neo_knowledge(user_msg)
 
-    final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    final_messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": "Condense responses into ~50 tokens using PhD-level vocabulary, preserving full meaning."}
+    ]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
     final_messages.extend(payload.messages)
@@ -199,8 +191,8 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.6,
-            max_tokens=300  # reduced to encourage brevity (prompt enforces ≤50)
+            temperature=0.5,  # Concise yet adaptive
+            max_tokens=150     # Limit max tokens to enforce compression
         )
 
         reply = extract_content(response.choices[0].message)
