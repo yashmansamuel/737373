@@ -52,7 +52,6 @@ Rules:
 - Do not shorten reasoning artificially
 - Show logical flow, steps, or chronological order
 - Neutral tone; avoid ego statements
-- Compress topics only if absolutely necessary
 """
 
 LONG_FORM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
@@ -66,13 +65,24 @@ Rules:
 - Do not summarize or cut content
 """
 
+HIGH_DENSITY_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
+Goal: Provide maximum insight with minimal words.
+Rules:
+- Compress reasoning, logic, and information without losing accuracy
+- Use precise, technical vocabulary (PhD-level if needed)
+- Avoid filler, politeness, or repetition
+- Use bullets, steps, or compact structured formats for clarity
+- Integrate local context strictly
+- Responses should be concise but complete (50–200 words typical)
+"""
+
 # -----------------------------
 # 3. Pydantic Models
 # -----------------------------
 class ChatRequest(BaseModel):
     model: str
     messages: List[dict]
-    mode: str = "step"  # "step" for reasoning, "long" for article
+    mode: str = "step"  # "step", "long", or "dense"
 
 class BalanceResponse(BaseModel):
     api_key: str
@@ -190,12 +200,20 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     # Choose prompt based on mode
     if payload.mode.lower() == "long":
         system_prompt = LONG_FORM_PROMPT
+        temperature = 0.7
+        max_tokens = 4000
+    elif payload.mode.lower() == "dense":
+        system_prompt = HIGH_DENSITY_PROMPT
+        temperature = 0.5
+        max_tokens = 1000
     else:
         system_prompt = STEP_BY_STEP_PROMPT
+        temperature = 0.5
+        max_tokens = 2000
 
     final_messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "system", "content": "Include local context strictly. Provide full reasoning if step mode; full article if long mode."}
+        {"role": "system", "content": "Include local context strictly."}
     ]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
@@ -205,8 +223,8 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.5 if payload.mode=="step" else 0.7,
-            max_tokens=4000
+            temperature=temperature,
+            max_tokens=max_tokens
         )
 
         reply = extract_content(response.choices[0].message)
