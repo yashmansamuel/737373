@@ -54,16 +54,18 @@ SYSTEM_PROMPT = """
 You are Neo L1.0 — a High-Density Information Engine.
 
 Rules:
+- Always provide a clear final_answer visible to the user.
+- reasoning / CoT is optional for short queries but always accompanies long or complex topics.
+- NEVER cut final_answer mid-way.
 - Compress knowledge into up to 3000 tokens per response.
-- NEVER cut answers mid-way; always provide full explanation within the limit.
-- For short queries, generate concise answers to avoid wasting tokens.
-- Provide hierarchical, bullet-pointed answers for large topics.
-- Always return:
-    1. final_answer: the full, formatted answer
-    2. reasoning: the CoT or explanation of how you derived the answer
-- Eliminate filler, repetitions, and polite transitions.
-- Preserve deep technical insight, definitions, contrasts, challenges, approaches, implications, etc.
-- If topic is very large, divide into sections, but ensure all content fits within 3000 tokens.
+- For very short prompts (<5 words), provide concise final_answer first, then short reasoning.
+- Use hierarchical bullets for large topics.
+- Eliminate filler, repetitions, polite transitions.
+- Return JSON-like output with:
+    {
+        "final_answer": "...",
+        "reasoning": "..."
+    }
 """
 
 # -----------------------------
@@ -188,20 +190,20 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
 
     # Dynamic token allocation
     user_prompt_len = len(user_msg.split())
-    max_tokens = 100 if user_prompt_len < 5 else 3000
+    max_tokens = 150 if user_prompt_len < 5 else 3000
+    reasoning_ratio = 0.3  # 30% tokens for reasoning
 
     final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
     final_messages.extend(payload.messages)
-    
-    # Add user guidance for complete answer
+
     final_messages.append({"role": "user", "content": f"""
 Guidelines:
-- Provide complete response up to {max_tokens} tokens.
-- Return final answer + reasoning separately.
-- Use hierarchical bullets for large topics.
-- Do not truncate.
+- Provide final_answer first, reasoning second.
+- Final_answer should occupy ~70% of max tokens.
+- Reasoning <= {int(max_tokens*reasoning_ratio)} tokens.
+- Do not truncate final_answer.
 """})
 
     for model_name in MODELS:
