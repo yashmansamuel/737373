@@ -50,7 +50,21 @@ MODELS = [
     "llama-3.3-70b-versatile"
 ]
 
-SYSTEM_PROMPT = "High-Density Info Engine. Compress topics into 4000 tokens. No filler. Provide core logic and deep insights. Use hierarchical bullets for large topics."
+SYSTEM_PROMPT = """
+You are Neo L1.0 — a High-Density Information Engine.
+
+Rules:
+- Compress knowledge into up to 3000 tokens per response.
+- NEVER cut answers mid-way; always provide full explanation within the limit.
+- For short queries, generate concise answers to avoid wasting tokens.
+- Provide hierarchical, bullet-pointed answers for large topics.
+- Always return:
+    1. final_answer: the full, formatted answer
+    2. reasoning: the CoT or explanation of how you derived the answer
+- Eliminate filler, repetitions, and polite transitions.
+- Preserve deep technical insight, definitions, contrasts, challenges, approaches, implications, etc.
+- If topic is very large, divide into sections, but ensure all content fits within 3000 tokens.
+"""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -170,37 +184,28 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         raise HTTPException(402, "No tokens left")
 
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
-    
-    # --- Greeting shortcut ---
-    if user_msg.lower() in ["hi", "hello", "hey"]:
-        return {
-            "company": "signaturesi.com",
-            "final_answer": "Hello! How can I assist you today?",
-            "reasoning": "",
-            "usage": {"total_tokens": 0, "reasoning_tokens": 0},
-            "model": "Neo L1.0",
-            "internal_engine": "shortcut",
-            "balance": balance
-        }
+    local_data = get_neo_knowledge(user_msg)
 
-    # --- Knowledge / RAG ---
-    local_data = get_neo_knowledge(user_msg) if len(user_msg.split()) > 5 else ""
+    # Dynamic token allocation
+    user_prompt_len = len(user_msg.split())
+    max_tokens = 100 if user_prompt_len < 5 else 3000
 
-    # --- Build messages ---
     final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
     final_messages.extend(payload.messages)
+    
+    # Add user guidance for complete answer
+    final_messages.append({"role": "user", "content": f"""
+Guidelines:
+- Provide complete response up to {max_tokens} tokens.
+- Return final answer + reasoning separately.
+- Use hierarchical bullets for large topics.
+- Do not truncate.
+"""})
 
-    # --- Select models based on query length ---
-    models_to_use = MODELS.copy()
-    if len(user_msg) < 5:
-        models_to_use = ["openai/gpt-oss-20b"]  # smaller model for tiny queries
-
-    for model_name in models_to_use:
+    for model_name in MODELS:
         try:
-            max_tokens = min(3000, len(user_msg.split())*20 + 200)
-
             response = GROQ.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
@@ -216,7 +221,6 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             reasoning_tokens = getattr(response.usage, "prompt_tokens", 0)
             new_balance = max(0, balance - total_tokens)
 
-            # Async update token balance
             asyncio.create_task(asyncio.to_thread(
                 lambda: SUPABASE.table("users")
                 .update({"token_balance": new_balance})
