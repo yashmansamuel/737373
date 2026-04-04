@@ -2,7 +2,7 @@ import os
 import secrets
 import asyncio
 import json
-from typing import List, Optional
+from typing import List
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,86 +11,93 @@ from dotenv import load_dotenv
 from groq import Groq
 
 load_dotenv()
-
-# Clients
 SUPABASE: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Minimal System Prompt for low overhead
-SYSTEM_PROMPT = "You are Neo L1.0. Output ONLY JSON: {\"final_answer\": \"...\", \"reasoning\": \"...\"}."
+# --- OPTIMIZED SYSTEM PROMPT ---
+# Isme humne tokens ki strict instruction di hai
+SYSTEM_PROMPT = (
+    "You are Neo L1.0. Role: Technical Researcher. "
+    "CONSTRAINT: Your reasoning must be ultra-short (max 50 tokens). "
+    "Your final_answer should be detailed and high-quality. "
+    "Output ONLY JSON: {\"final_answer\": \"...\", \"reasoning\": \"...\"}. "
+    "Total response must stay under 3000 tokens."
+)
+
+MODELS = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
 
 class ChatRequest(BaseModel):
     messages: List[dict]
 
 @app.post("/v1/chat/completions")
 async def chat_engine(payload: ChatRequest, authorization: str = Header(None)):
-    if not authorization or "Bearer " not in authorization:
-        raise HTTPException(401, "API Key Missing")
+    if not authorization: raise HTTPException(401, "Key Missing")
     
-    api_key = authorization.split(" ")[1]
+    api_key = authorization.replace("Bearer ", "")
     
-    # 1. Fetch User from Supabase
-    user_res = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
-    if not user_res.data:
-        raise HTTPException(401, "Invalid Key")
+    # 1. Fetch Real User Balance
+    user_data = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
+    if not user_data.data: raise HTTPException(401, "Invalid Key")
     
-    current_balance = user_res.data["token_balance"]
-    if current_balance <= 0:
-        raise HTTPException(402, "Balance Exhausted")
+    balance = user_data.data["token_balance"]
+    if balance <= 0: raise HTTPException(402, "Balance Exhausted")
 
-    # 2. Prepare Minimal Messages (Latest 2 for context saving)
-    input_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    input_messages.extend(payload.messages[-2:])
+    # 2. Token Saving: Filter History (Only keep last 2 messages)
+    # Isse Input Burn 90% kam ho jayega
+    clean_history = payload.messages[-2:] if len(payload.messages) > 2 else payload.messages
+    
+    final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    final_messages.extend(clean_history)
 
-    try:
-        # 3. Call Groq
-        response = GROQ.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=input_messages,
-            temperature=0.5,
-            response_format={"type": "json_object"}
-        )
-
-        # 4. GET ACTUAL TOKENS FROM GROQ (No estimation here)
-        # Groq returns exact usage: prompt_tokens + completion_tokens
-        actual_usage = response.usage
-        total_tokens_used = actual_usage.total_tokens 
-        
-        # 5. Extract Content
-        raw_content = response.choices[0].message.content
+    for model_id in MODELS:
         try:
-            data = json.loads(raw_content)
-        except:
-            data = {"final_answer": raw_content, "reasoning": "N/A"}
+            # 3. Groq API Call
+            response = GROQ.chat.completions.create(
+                model=model_id,
+                messages=final_messages,
+                temperature=0.4,
+                max_tokens=3000, # Full response limit
+                response_format={"type": "json_object"}
+            )
+            
+            # --- REAL TOKEN COUNT FROM GROQ ---
+            real_usage = response.usage
+            total_burned = real_usage.total_tokens # Exactly what Groq charged
+            prompt_tokens = real_usage.prompt_tokens
+            completion_tokens = real_usage.completion_tokens
+            
+            content = response.choices[0].message.content
+            parsed_data = json.loads(content)
 
-        # 6. Update Database with EXACT count
-        new_balance = max(0, current_balance - total_tokens_used)
-        
-        # Background task for DB sync to keep API fast
-        SUPABASE.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
+            # 4. Accurate DB Update
+            new_balance = max(0, balance - total_burned)
+            SUPABASE.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
 
-        # 7. Return exact figures to User
-        return {
-            "company": "signaturesi.com",
-            "final_answer": data.get("final_answer"),
-            "reasoning": data.get("reasoning"),
-            "usage": {
-                "total": total_tokens_used, # REAL count from Groq
-                "prompt": actual_usage.prompt_tokens,
-                "completion": actual_usage.completion_tokens
-            },
-            "balance": new_balance
-        }
+            return {
+                "company": "signaturesi.com",
+                "final_answer": parsed_data.get("final_answer"),
+                "reasoning": parsed_data.get("reasoning"),
+                "usage": {
+                    "total": total_burned,
+                    "input_burn": prompt_tokens,
+                    "output_gen": completion_tokens
+                },
+                "balance": new_balance,
+                "model": model_id
+            }
 
-    except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(500, "Neo Engine Error")
+        except Exception as e:
+            print(f"Model {model_id} Error: {e}")
+            continue
 
+    raise HTTPException(503, "All Engines Busy")
+
+# Helper to create keys
 @app.post("/v1/user/new-key")
 def create_key():
-    new_key = f"sig-{secrets.token_hex(16)}"
-    SUPABASE.table("users").insert({"api_key": new_key, "token_balance": 50000}).execute()
-    return {"api_key": new_key, "balance": 50000}
+    k = f"sig-{secrets.token_hex(16)}"
+    SUPABASE.table("users").insert({"api_key": k, "token_balance": 50000}).execute()
+    return {"key": k}
