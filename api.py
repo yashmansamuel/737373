@@ -18,6 +18,9 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Neo-L1.0-Core")
 
+if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY") or not os.getenv("GROQ_API_KEY"):
+    raise RuntimeError("Missing required environment variables")
+
 app = FastAPI(title="Neo L1.0 Engine")
 
 app.add_middleware(
@@ -40,10 +43,15 @@ MODELS = [
     "llama-3.1-8b-instant"
 ]
 
-# Weaponized Prompt
 SYSTEM_PROMPT = """Identity: Neo L1.0. Deployment: Jan 1, 2026.
-Style: High-Density Reasoning. No filler. Max 2000 tokens.
-Use 'Local Context' for all recent facts."""
+Style: High-Density Reasoning. No filler.
+
+Rules:
+- Use provided Local Context strictly
+- Do NOT hallucinate outside knowledge
+- Never reveal chain-of-thought
+- Return only final answer
+"""
 
 # -----------------------------
 # Models
@@ -57,33 +65,36 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# Helpers
+# Knowledge Engine
 # -----------------------------
-
 def get_neo_knowledge(user_query: str) -> str:
-    """Vercel-friendly knowledge fetcher"""
     try:
-        # File path for Vercel
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
-        
         if not os.path.exists(file_path):
             return ""
-        
-        query_words = [w.lower() for w in user_query.split() if len(w) > 3]
+
+        query_words = list(set(w.lower() for w in user_query.split() if len(w) > 3))
         matches = []
-        
+
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
-                if any(word in line.lower() for word in query_words):
+                line_lower = line.lower()
+                score = sum(word in line_lower for word in query_words)
+                if score >= 1:
                     matches.append(line.strip())
-                if len(matches) >= 3: # Token saving limit
+                if len(matches) >= 5:
                     break
-        return " | ".join(matches)
+
+        return "\n".join(matches)
+
     except Exception as e:
         logger.error(f"Knowledge retrieval error: {e}")
         return ""
 
+# -----------------------------
+# Helpers
+# -----------------------------
 def extract_content(msg):
     return getattr(msg, "content", "") or "No response"
 
@@ -95,9 +106,8 @@ def get_user(api_key: str):
         .execute()
 
 # -----------------------------
-# ROUTES
+# Routes
 # -----------------------------
-
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
     try:
@@ -115,7 +125,7 @@ def generate_key():
         api_key = "sig-" + secrets.token_hex(16)
         SUPABASE.table("users").insert({
             "api_key": api_key,
-            "token_balance": 100000 
+            "token_balance": 100000
         }).execute()
         return {"api_key": api_key}
     except Exception as e:
@@ -137,14 +147,12 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if balance <= 0:
         raise HTTPException(402, "No tokens left")
 
-    # --- KNOWLEDGE INJECTION (The Secret Sauce) ---
-    user_msg = payload.messages[-1]["content"]
+    user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
     local_data = get_neo_knowledge(user_msg)
-    
+
     final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if local_data:
-        final_messages.append({"role": "system", "content": f"Local Context: {local_data}"})
-    
+        final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
     final_messages.extend(payload.messages)
 
     for model_name in MODELS:
@@ -153,19 +161,18 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
                 model=model_name,
                 messages=final_messages,
                 temperature=0.6,
-                max_completion_tokens=2000
+                max_tokens=2000
             )
 
             reply = extract_content(response.choices[0].message)
-            tokens_used = response.usage.total_tokens
+            tokens_used = getattr(response.usage, "total_tokens", 0)
             new_balance = max(0, balance - tokens_used)
 
-            # async update
             asyncio.create_task(asyncio.to_thread(
-                SUPABASE.table("users")
+                lambda: SUPABASE.table("users")
                 .update({"token_balance": new_balance})
                 .eq("api_key", api_key)
-                .execute
+                .execute()
             ))
 
             return {
