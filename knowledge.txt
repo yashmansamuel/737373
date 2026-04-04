@@ -1,18 +1,29 @@
 [topic] ai_saas
-definition AI SaaS platform content generation automation
-features chatbot API multi model fast responses low cost
-pricing $10 basic 100k tokens $25 pro 500k tokens
-target users developers startups businesses
+definition AI SaaS platform that automates content generation and chatbot responses
+features Multi-model support, Fast responses, API access, Low-cost pricing
+pricing Basic: $10/month for 100k tokens, Pro: $25/month for 500k tokens
+examples Small startups use Basic, Enterprises use Pro for high-volume queries
+rule Always answer based only on these facts
+rule Do not hallucinate if information is missing
 
 [topic] support
 email support@yourapp.com
 response_time 24 hours
-help_docs available
+help_docs Available online at https://neo.signaturesi.com/docs
+rule Always provide support contact from this section
+rule Never invent support info
 
 [topic] coding
-languages python javascript fastapi nodejs
-purpose backend API AI integration automation
+languages Python, JavaScript, FastAPI
+purpose Backend API, AI integration, Automation
+rule Answer only with listed languages and purposes
 
-rule always answer based on given knowledge
-rule do not guess if data missing
-rule prioritize pricing and features info
+[topic] chatbot_usage
+example How to send a message via API
+example How to check token balance programmatically
+rule Always include API usage examples when asked
+
+[topic] pricing
+plans Basic, Pro
+cost Basic: 10$/100k tokens, Pro: 25$/500k tokens
+rule Always use these values for pricing questions
