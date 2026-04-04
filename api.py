@@ -19,7 +19,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Neo-L1.0-Core")
 
-# Validation check for environment variables
+# Validation for required environment variables
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
 for var in required_vars:
     if not os.getenv(var):
@@ -41,26 +41,25 @@ SUPABASE: Client = create_client(
 
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Only one model now
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# System Prompt with Adaptive Compression
+# 2. System Prompt (Neutral Step-by-Step Reasoning)
 # -----------------------------
-SYSTEM_PROMPT = """Identity: Neo L1.0. Deployment: Jan 1, 2026.
-Style: High-Density Reasoning. PhD-level vocabulary. Concise.
-Compression: Always summarize content into ~50 tokens without losing critical meaning.
+SYSTEM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
+Goal: Analyze queries and provide concise, step-by-step reasoning.
 Rules:
-- Use provided Local Context strictly
-- Do NOT hallucinate outside knowledge
-- Never reveal chain-of-thought
-- Return only the final answer, compact and high-level
-- Adaptive: If the question is simple, still provide sophisticated phrasing
-- Prioritize precision over verbosity
+- Use local context strictly
+- Eliminate filler, repetition, or unnecessary politeness
+- Provide clear step-by-step logic or timeline if applicable
+- Compress large topics into maximum 4,000 tokens
+- Neutral tone; do not claim intelligence or titles
+- Prioritize core logic, insights, and actionable info
+- Structure complex topics with hierarchical bullet points
 """
 
 # -----------------------------
-# 2. Pydantic Models
+# 3. Pydantic Models
 # -----------------------------
 class ChatRequest(BaseModel):
     model: str
@@ -71,7 +70,7 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# 3. Custom Branding & Error Handlers
+# 4. Custom Branding & Error Handlers
 # -----------------------------
 @app.get("/")
 async def root():
@@ -94,7 +93,7 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 4. Knowledge Engine (RAG)
+# 5. Knowledge Engine (RAG)
 # -----------------------------
 def get_neo_knowledge(user_query: str) -> str:
     try:
@@ -122,7 +121,7 @@ def get_neo_knowledge(user_query: str) -> str:
         return ""
 
 # -----------------------------
-# 5. Helper Functions
+# 6. Helper Functions
 # -----------------------------
 def extract_content(msg):
     return getattr(msg, "content", "") or "No response"
@@ -135,7 +134,7 @@ def get_user(api_key: str):
         .execute()
 
 # -----------------------------
-# 6. API Routes
+# 7. API Routes
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
@@ -181,7 +180,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
 
     final_messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "system", "content": "Condense responses into ~50 tokens using PhD-level vocabulary, preserving full meaning."}
+        {"role": "system", "content": "Provide reasoning step-by-step like a human; show timeline or logic flow. Avoid filler, maintain neutral tone."}
     ]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
@@ -191,15 +190,14 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.5,  # Concise yet adaptive
-            max_tokens=150     # Limit max tokens to enforce compression
+            temperature=0.5,
+            max_tokens=4000
         )
 
         reply = extract_content(response.choices[0].message)
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = max(0, balance - tokens_used)
 
-        # Async background update for database
         asyncio.create_task(asyncio.to_thread(
             lambda: SUPABASE.table("users")
             .update({"token_balance": new_balance})
