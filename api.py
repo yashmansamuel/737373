@@ -19,7 +19,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Neo-L1.0-Core")
 
-# Validation for required environment variables
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
 for var in required_vars:
     if not os.getenv(var):
@@ -44,18 +43,17 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. System Prompt (Neutral Step-by-Step Reasoning)
+# 2. System Prompt for Full Reasoning
 # -----------------------------
 SYSTEM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Analyze queries and provide concise, step-by-step reasoning.
+Goal: Provide step-by-step reasoning, timelines, or hierarchical logic explanations.
 Rules:
 - Use local context strictly
-- Eliminate filler, repetition, or unnecessary politeness
-- Provide clear step-by-step logic or timeline if applicable
-- Compress large topics into maximum 4,000 tokens
-- Neutral tone; do not claim intelligence or titles
-- Prioritize core logic, insights, and actionable info
-- Structure complex topics with hierarchical bullet points
+- Do not shorten reasoning artificially
+- Show logical flow, steps, or chronological order
+- Neutral tone; avoid ego statements
+- Compress topics only if absolutely necessary
+- Prioritize clarity, depth, and correctness
 """
 
 # -----------------------------
@@ -180,7 +178,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
 
     final_messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "system", "content": "Provide reasoning step-by-step like a human; show timeline or logic flow. Avoid filler, maintain neutral tone."}
+        {"role": "system", "content": "Provide full step-by-step reasoning, timeline, or logical flow. Do not shorten reasoning; show all relevant steps."}
     ]
     if local_data:
         final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
