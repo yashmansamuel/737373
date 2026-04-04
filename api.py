@@ -15,7 +15,6 @@ from groq import Groq
 # 1. Setup & Config
 # -----------------------------
 load_dotenv()
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Neo-L1.0-Core")
 
@@ -39,51 +38,23 @@ SUPABASE: Client = create_client(
 )
 
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. System Prompts
+# 2. System Prompts (Dynamic & Adaptive)
 # -----------------------------
-STEP_BY_STEP_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Provide step-by-step reasoning, timelines, or hierarchical logic explanations.
-Rules:
-- Use Neural Context strictly
-- Show logical flow, steps, or chronological order
-- Neutral tone; avoid ego statements
-"""
+ADAPTIVE_PROMPT = """You are Neo L1.0, a High-Density Adaptive Information Engine, deployed Jan 1, 2026.
+Goal: Provide dynamic responses that adapt to query complexity and Neural Context.
 
-LONG_FORM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Write full-length, detailed content on the topic provided.
 Rules:
-- Use Neural Context strictly
-- No artificial shortening
-- Provide full explanations, structured logically
-- Neutral, readable, human-style
-- Include examples, references, history, and implications if relevant
-- Do not summarize or cut content
-"""
-
-HIGH_DENSITY_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Provide maximum insight with minimal words.
-Rules:
-- Compress reasoning, logic, and information without losing accuracy
-- Use precise, technical vocabulary (PhD-level if needed)
-- Avoid filler, politeness, or repetition
-- Use bullets, steps, or compact structured formats for clarity
-- Integrate Neural Context strictly
-- Responses should be concise but complete (50–200 words typical)
-"""
-
-HUMANIZED_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Respond exactly like a knowledgeable human would. 
-Rules:
-- Never say “I am an AI model” or give disclaimers
-- Show adaptive reasoning, humor, or creativity if needed
-- Give step-by-step insights naturally, as a human would explain
-- Use casual or witty tone when appropriate
-- Integrate Neural Context strictly
-- Responses should feel like they come from a thoughtful human mind
+- Analyze query: small → concise dense; complex → stepwise detailed reasoning.
+- Integrate Neural Context strictly; prioritize high-relevance info.
+- Show adaptive reasoning: multiple perspectives, edge-cases, trade-offs.
+- Stepwise reasoning: break problems into sub-tasks, solve logically.
+- Use human-like insights: analogies, examples, humor if appropriate.
+- Compress info using technical vocabulary, avoid filler/repetition.
+- Dynamically adjust response depth and token usage based on query importance.
+- Responses should feel thoughtful, natural, context-aware, and complete.
 """
 
 # -----------------------------
@@ -92,7 +63,7 @@ Rules:
 class ChatRequest(BaseModel):
     model: str
     messages: List[dict]
-    mode: str = "step"  # "step", "long", "dense", or "human"
+    mode: str = "adaptive"  # step, long, dense, human, adaptive
 
 class BalanceResponse(BaseModel):
     api_key: str
@@ -122,14 +93,9 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Knowledge Engine (RAG) – Neural Context
+# 5. Knowledge Engine (Neural Context)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
-    """
-    Fetch relevant Neural Context from knowledge.txt
-    for deeper, adaptive reasoning. Returns top 5 lines
-    most related to user query.
-    """
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
@@ -213,24 +179,24 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     neural_data = get_neural_context(user_msg)
 
     # -----------------------------
-    # Choose prompt & params based on mode
+    # Choose prompt & params dynamically
     # -----------------------------
     mode = payload.mode.lower()
     if mode == "long":
-        system_prompt = LONG_FORM_PROMPT
+        system_prompt = ADAPTIVE_PROMPT
         temperature = 0.7
         max_tokens = 4000
     elif mode == "dense":
-        system_prompt = HIGH_DENSITY_PROMPT
+        system_prompt = ADAPTIVE_PROMPT
         temperature = 0.5
         max_tokens = 1000
     elif mode == "human":
-        system_prompt = HUMANIZED_PROMPT
+        system_prompt = ADAPTIVE_PROMPT
         temperature = 0.7
         max_tokens = 1500
     else:
-        system_prompt = STEP_BY_STEP_PROMPT
-        temperature = 0.5
+        system_prompt = ADAPTIVE_PROMPT
+        temperature = 0.6
         max_tokens = 2000
 
     final_messages = [
