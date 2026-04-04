@@ -48,7 +48,7 @@ MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 STEP_BY_STEP_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
 Goal: Provide step-by-step reasoning, timelines, or hierarchical logic explanations.
 Rules:
-- Use local context strictly
+- Use Neural Context strictly
 - Show logical flow, steps, or chronological order
 - Neutral tone; avoid ego statements
 """
@@ -56,7 +56,7 @@ Rules:
 LONG_FORM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
 Goal: Write full-length, detailed content on the topic provided.
 Rules:
-- Use local context strictly
+- Use Neural Context strictly
 - No artificial shortening
 - Provide full explanations, structured logically
 - Neutral, readable, human-style
@@ -71,7 +71,7 @@ Rules:
 - Use precise, technical vocabulary (PhD-level if needed)
 - Avoid filler, politeness, or repetition
 - Use bullets, steps, or compact structured formats for clarity
-- Integrate local context strictly
+- Integrate Neural Context strictly
 - Responses should be concise but complete (50–200 words typical)
 """
 
@@ -82,7 +82,7 @@ Rules:
 - Show adaptive reasoning, humor, or creativity if needed
 - Give step-by-step insights naturally, as a human would explain
 - Use casual or witty tone when appropriate
-- Integrate local context strictly
+- Integrate Neural Context strictly
 - Responses should feel like they come from a thoughtful human mind
 """
 
@@ -122,16 +122,21 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Knowledge Engine (RAG)
+# 5. Knowledge Engine (RAG) – Neural Context
 # -----------------------------
-def get_neo_knowledge(user_query: str) -> str:
+def get_neural_context(user_query: str) -> str:
+    """
+    Fetch relevant Neural Context from knowledge.txt
+    for deeper, adaptive reasoning. Returns top 5 lines
+    most related to user query.
+    """
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
         if not os.path.exists(file_path):
             return ""
 
-        query_words = list(set(w.lower() for w in user_query.split() if len(w) > 3))
+        query_words = [w.lower() for w in user_query.split() if len(w) > 3]
         matches = []
 
         with open(file_path, "r", encoding="utf-8") as f:
@@ -146,7 +151,7 @@ def get_neo_knowledge(user_query: str) -> str:
         return "\n".join(matches)
 
     except Exception as e:
-        logger.error(f"Knowledge retrieval error: {e}")
+        logger.error(f"Neural Context retrieval error: {e}")
         return ""
 
 # -----------------------------
@@ -205,7 +210,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         raise HTTPException(402, "No tokens left")
 
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
-    local_data = get_neo_knowledge(user_msg)
+    neural_data = get_neural_context(user_msg)
 
     # -----------------------------
     # Choose prompt & params based on mode
@@ -230,10 +235,10 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
 
     final_messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "system", "content": "Include local context strictly."}
+        {"role": "system", "content": "Integrate Neural Context strictly."}
     ]
-    if local_data:
-        final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
+    if neural_data:
+        final_messages.append({"role": "system", "content": f"Neural Context:\n{neural_data}"})
     final_messages.extend(payload.messages)
 
     try:
