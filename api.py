@@ -1,9 +1,9 @@
 import os
 import logging
 import secrets
-import asyncio
+import json
 from typing import List
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, HTTPException, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -24,7 +24,7 @@ for var in required_vars:
     if not os.getenv(var):
         raise RuntimeError(f"Missing required environment variable: {var}")
 
-app = FastAPI(title="Neo L1.0 Engine")
+app = FastAPI(title="Neo L1.0 Engine - Optimized")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,39 +33,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SUPABASE: Client = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
-
+SUPABASE: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # -----------------------------
 # 2. Models & Prompts
 # -----------------------------
+# Note: Ensure these model names are active in your Groq account
 MODELS = [
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "qwen/qwen3-32b",
-    "llama-3.3-70b-versatile"
+    "llama-3.3-70b-versatile",
+    "llama3-70b-8192",
+    "mixtral-8x7b-32768"
 ]
 
 SYSTEM_PROMPT = """
 You are Neo L1.0 — a High-Density Information Engine.
+Your output MUST be a valid JSON object. 
+
+Structure:
+{
+  "reasoning": "Brief logic flow (max 500 tokens)",
+  "final_answer": "Comprehensive, detailed information (up to 2500 tokens)"
+}
 
 Rules:
-- Always provide a clear final_answer visible to the user.
-- reasoning / CoT is optional for short queries but always accompanies long or complex topics.
-- NEVER cut final_answer mid-way.
-- Compress knowledge into up to 3000 tokens per response.
-- For very short prompts (<5 words), provide concise final_answer first, then short reasoning.
-- Use hierarchical bullets for large topics.
-- Eliminate filler, repetitions, polite transitions.
-- Return JSON-like output with:
-    {
-        "final_answer": "...",
-        "reasoning": "..."
-    }
+- NEVER cut 'final_answer' mid-sentence.
+- Use hierarchical bullets for complex topics.
+- Eliminate all filler words and polite transitions.
+- If the query is short, still provide both fields but keep reasoning concise.
 """
 
 # -----------------------------
@@ -75,179 +70,96 @@ class ChatRequest(BaseModel):
     model: str
     messages: List[dict]
 
-class BalanceResponse(BaseModel):
-    api_key: str
-    balance: int
+# -----------------------------
+# 4. Helper Functions
+# -----------------------------
+def update_user_balance(api_key: str, new_balance: int):
+    try:
+        SUPABASE.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
+    except Exception as e:
+        logger.error(f"DB Update Error: {e}")
 
-# -----------------------------
-# 4. Custom Branding & Error Handlers
-# -----------------------------
-@app.get("/")
-async def root():
-    return {
-        "company": "signaturesi.com",
-        "engine": "Neo L1.0 Core",
-        "status": "running",
-        "deployment": "Jan 1, 2026"
-    }
-
-@app.exception_handler(404)
-async def custom_404_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={
-            "company": "signaturesi.com",
-            "status": "running",
-            "message": "Endpoint not found"
-        }
-    )
-
-# -----------------------------
-# 5. Knowledge Engine (RAG)
-# -----------------------------
 def get_neo_knowledge(user_query: str) -> str:
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
-        if not os.path.exists(file_path):
-            return ""
+        if not os.path.exists(file_path): return ""
 
-        query_words = list(set(w.lower() for w in user_query.split() if len(w) > 3))
+        query_words = [w.lower() for w in user_query.split() if len(w) > 3]
         matches = []
-
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
-                line_lower = line.lower()
-                score = sum(word in line_lower for word in query_words)
-                if score >= 1:
+                if any(word in line.lower() for word in query_words):
                     matches.append(line.strip())
-                if len(matches) >= 5:
-                    break
-
+                if len(matches) >= 5: break
         return "\n".join(matches)
-
-    except Exception as e:
-        logger.error(f"Knowledge retrieval error: {e}")
-        return ""
+    except Exception: return ""
 
 # -----------------------------
-# 6. Helper Functions
+# 5. API Routes
 # -----------------------------
-def extract_content(msg):
-    return getattr(msg, "content", "") or "No response"
-
-def get_user(api_key: str):
-    return SUPABASE.table("users") \
-        .select("token_balance") \
-        .eq("api_key", api_key) \
-        .maybe_single() \
-        .execute()
-
-# -----------------------------
-# 7. API Routes
-# -----------------------------
-@app.get("/v1/user/balance", response_model=BalanceResponse)
-def get_balance(api_key: str):
-    try:
-        user = get_user(api_key)
-        if not user.data:
-            return {"api_key": api_key, "balance": 0}
-        return {"api_key": api_key, "balance": user.data.get("token_balance", 0)}
-    except Exception as e:
-        logger.error(f"Balance Error: {e}")
-        raise HTTPException(500, "Balance fetch failed")
-
-@app.post("/v1/user/new-key")
-def generate_key():
-    try:
-        api_key = "sig-" + secrets.token_hex(16)
-        SUPABASE.table("users").insert({
-            "api_key": api_key,
-            "token_balance": 100000
-        }).execute()
-        return {"api_key": api_key, "company": "signaturesi.com"}
-    except Exception as e:
-        logger.error(f"Key generation error: {e}")
-        raise HTTPException(500, "Failed to create key")
+@app.get("/")
+async def root():
+    return {"company": "signaturesi.com", "engine": "Neo L1.0 Core", "status": "online"}
 
 @app.post("/v1/chat/completions")
-async def chat(payload: ChatRequest, authorization: str = Header(None)):
+async def chat(payload: ChatRequest, background_tasks: BackgroundTasks, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Invalid API key")
+        raise HTTPException(401, "Missing or invalid API key")
 
     api_key = authorization.replace("Bearer ", "")
-    user = get_user(api_key)
-
-    if not user.data:
-        raise HTTPException(401, "User not found")
-
-    balance = user.data["token_balance"]
+    
+    # 1. Check User
+    user_res = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
+    if not user_res.data:
+        raise HTTPException(401, "User unauthorized")
+    
+    balance = user_res.data["token_balance"]
     if balance <= 0:
-        raise HTTPException(402, "No tokens left")
+        raise HTTPException(402, "Insufficient token balance")
 
-    user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
-    local_data = get_neo_knowledge(user_msg)
+    # 2. Context & Prompt Setup
+    user_msg = payload.messages[-1].get("content", "")
+    local_context = get_neo_knowledge(user_msg)
+    
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if local_context:
+        full_messages.append({"role": "system", "content": f"Context: {local_context}"})
+    full_messages.extend(payload.messages)
 
-    # Dynamic token allocation
-    user_prompt_len = len(user_msg.split())
-    max_tokens = 150 if user_prompt_len < 5 else 3000
-    reasoning_ratio = 0.3  # 30% tokens for reasoning
-
-    final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    if local_data:
-        final_messages.append({"role": "system", "content": f"Local Context:\n{local_data}"})
-    final_messages.extend(payload.messages)
-
-    final_messages.append({"role": "user", "content": f"""
-Guidelines:
-- Provide final_answer first, reasoning second.
-- Final_answer should occupy ~70% of max tokens.
-- Reasoning <= {int(max_tokens*reasoning_ratio)} tokens.
-- Do not truncate final_answer.
-"""})
-
+    # 3. Model Execution
     for model_name in MODELS:
         try:
             response = GROQ.chat.completions.create(
                 model=model_name,
-                messages=final_messages,
-                temperature=0.6,
-                max_tokens=max_tokens
+                messages=full_messages,
+                temperature=0.5,
+                max_tokens=3000, # Hard limit
+                response_format={"type": "json_object"} # Forces JSON
             )
 
-            message_obj = response.choices[0].message
-            final_answer = getattr(message_obj, "content", "")
-            reasoning = getattr(message_obj, "reasoning", "")
-
-            total_tokens = getattr(response.usage, "total_tokens", 0)
-            reasoning_tokens = getattr(response.usage, "prompt_tokens", 0)
+            # Parse JSON safely
+            raw_content = response.choices[0].message.content
+            parsed_res = json.loads(raw_content)
+            
+            total_tokens = response.usage.total_tokens
             new_balance = max(0, balance - total_tokens)
 
-            asyncio.create_task(asyncio.to_thread(
-                lambda: SUPABASE.table("users")
-                .update({"token_balance": new_balance})
-                .eq("api_key", api_key)
-                .execute()
-            ))
+            # Update DB in background to keep API fast
+            background_tasks.add_task(update_user_balance, api_key, new_balance)
 
             return {
                 "company": "signaturesi.com",
-                "final_answer": final_answer,
-                "reasoning": reasoning,
-                "usage": {
-                    "total_tokens": total_tokens,
-                    "reasoning_tokens": reasoning_tokens
-                },
+                "final_answer": parsed_res.get("final_answer", "Error generating answer"),
+                "reasoning": parsed_res.get("reasoning", "No reasoning provided"),
+                "usage": {"total_tokens": total_tokens},
                 "model": "Neo L1.0",
                 "internal_engine": model_name,
                 "balance": new_balance
             }
 
         except Exception as e:
-            logger.error(f"{model_name} failed: {e}")
+            logger.error(f"Model {model_name} error: {e}")
             continue
 
-    raise HTTPException(
-        status_code=503,
-        detail={"company": "signaturesi.com", "status": "error", "message": "All Neo models failed"}
-    )
+    raise HTTPException(503, "All Neo engines are currently unavailable")
