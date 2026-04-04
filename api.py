@@ -43,8 +43,7 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 MODELS = [
     "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "llama-3.1-8b-instant"
+    "openai/gpt-oss-20b"
 ]
 
 SYSTEM_PROMPT = """Identity: Neo L1.0. Deployment: Jan 1, 2026.
