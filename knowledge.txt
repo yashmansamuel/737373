@@ -408,4 +408,306 @@ Context Windows & Task Specialization:
 • Long contexts (1M+ tokens) are mainstream — enabling large document understanding, summarization, and agent workflows.  
 • Agentic AI — models plan, execute, and iterate autonomously on multi‑step tasks.  
 Keywords: context window, agentic AI, workflow automation.
+# -----------------------------
+# 1. AI & GPT Models
+# -----------------------------
+GPT-3.5 (OpenAI, 2022): 175B parameters, natural language understanding and generation, used in chatbots and reasoning tasks.
+GPT-4 (OpenAI, 2023): 1T+ parameters, multimodal capabilities, advanced reasoning, summarization, and coding.
+GPT-4.1 (OpenAI, 2024): Optimized for dense reasoning, adaptive prompt handling, stepwise logic support.
+Neo L1.0 (Private, 2026): High-Density Reasoning Engine, uses Neural Context, adaptive stepwise responses, compresses large topics efficiently.
+Gemini (Google DeepMind, 2024–2025): Multi-modal LLM, integrated with reasoning pipelines, competitive with GPT-4.1 for structured tasks.
+
+# -----------------------------
+# 2. Elon Musk – Net Worth 2025
+# -----------------------------
+January 2025: $190B
+February 2025: $192B
+March 2025: $195B
+April 2025: $198B
+May 2025: $200B
+June 2025: $202B
+July 2025: $205B
+August 2025: $207B
+September 2025: $210B
+October 2025: $212B
+November 2025: $215B
+December 2025: $220B
+
+# -----------------------------
+# 3. AGI & AI Milestones
+# -----------------------------
+Dartmouth Summer Research Project (1956): Birth of AI concept.
+Alan Turing (1950): Turing Test proposed for machine intelligence.
+John McCarthy (1956): Coined term "Artificial Intelligence".
+AGI Concept: AI with human-level reasoning, learning, adaptation, problem-solving.
+Significant applications: healthcare, finance, transport, research automation.
+
+# -----------------------------
+# 4. Math Reasoning & Logic
+# -----------------------------
+Prime number theorem: Asymptotic distribution of primes ~ n/ln(n)
+Fermat's Last Theorem: x^n + y^n = z^n has no positive integer solutions for n>2
+Linear Algebra: Eigenvectors, eigenvalues, matrix decompositions for solving linear systems
+Calculus: Differentiation & integration rules, chain rule, multivariable optimization
+Probability & Statistics: Bayes theorem, expectation, variance, conditional probability
+
+# -----------------------------
+# 5. Gemini AI Specifics
+# -----------------------------
+Gemini 1 (2024): Multimodal LLM, 175B parameters, can analyze text, image, and structured data.
+Gemini 1.5 (2025): 350B parameters, improved reasoning pipelines, integrated timeline analysis.
+Capabilities: Stepwise reasoning, timeline compression, human-like summaries, code generation.
+Comparison: Competitive with GPT-4.1 in reasoning and dense logic tasks.
+
+# -----------------------------
+# 6. Neural Context Examples
+# -----------------------------
+User Query: "Explain AGI in 2025"
+Neural Context:
+- AGI refers to AI capable of human-like reasoning and problem-solving.
+- Key research: OpenAI GPT series, DeepMind Gemini, Meta LLaMA.
+- Impacts: Automation, industry transformation, ethics, policy discussions.
+- Historical context: Dartmouth 1956, Turing 1950, McCarthy 1956.
+- Recent milestones: GPT-4.1 (2024), Gemini 1.5 (2025).
+
+User Query: "Elon Musk net worth timeline 2025"
+Neural Context:
+- January 2025: $190B, December 2025: $220B
+- Key assets: Tesla, SpaceX, Neuralink, Boring Company
+- Monthly growth ~ $2–3B average
+- Market trends: EV expansion, Starship launches, AI investments
+- Historical growth: 2024: $180B → 2025: $220B
+
+# -----------------------------
+# 7. Neural Context Guidelines
+# -----------------------------
+- Provide **concise summaries** (50–200 words) when requested.
+- Use **stepwise logic** for timelines or reasoning tasks.
+- Include **references to models, dates, or historical events** when available.
+- Avoid robotic disclaimers; output **human-like adaptive reasoning**.
+- Compress large topics into **high-density, high-entropy responses**.
+- Respect the user query context strictly and integrate **relevant lines only**.
+# -----------------------------
+# 8. Advanced Reasoning & Meta-Knowledge
+# -----------------------------
+
+# 8.1 Multi-Step Logical Deduction
+- Principle: Break problems into sequential logical steps.
+- Example: To prove X implies Z via Y:
+    Step 1: X → Y
+    Step 2: Y → Z
+    Step 3: Combine: X → Z
+- Application: Mathematical proofs, algorithm design, causal inference.
+
+# 8.2 Meta-Cognition in Problem Solving
+- Concept: Monitor reasoning process for errors or gaps.
+- Use: Detect inconsistencies in multi-step derivations.
+- Example: Self-check loops in code, logical verification in proofs.
+
+# 8.3 High-Density Knowledge Compression
+- Principle: Convert 5,000-word explanations into 200-word high-entropy summaries without losing core meaning.
+- Technique: Hierarchical bullets, steps, structured abstractions.
+- Use: Summarize research papers, complex theories, AI model behaviors.
+
+# 8.4 Temporal & Event Reasoning
+- Principle: Use chronological logic to connect events.
+- Example: Predicting outcomes using historical trends:
+    Step 1: Identify past patterns
+    Step 2: Project trends
+    Step 3: Evaluate constraints
+    Step 4: Infer future probabilities
+- Application: Stock predictions, project planning, AI timelines.
+
+# 8.5 Counterfactual & Hypothetical Reasoning
+- Principle: Reason about "what-if" scenarios.
+- Example: If AGI had been deployed in 2020:
+    - Early adoption advantages
+    - Ethical implications
+    - Technological gaps filled
+- Application: Scenario planning, AI policy, simulation.
+
+# 8.6 Recursive & Nested Reasoning
+- Principle: Solve problems where outputs of one reasoning step feed into the next recursively.
+- Example: Recursive function analysis, mathematical induction, proof chains.
+- Application: Algorithm optimization, theorem proving, game theory.
+
+# 8.7 High-Density Mathematical Reasoning
+- Topics: Advanced combinatorics, abstract algebra, real analysis, probability chains, optimization problems.
+- Technique: Stepwise deduction, hierarchical structure, symbolic computation.
+- Example: Solve multivariate optimization with constraints in 5 structured steps.
+
+# 8.8 Cross-Domain Integration
+- Principle: Merge insights from multiple fields for reasoning.
+- Example: Physics + AI + Economics → Predict impact of autonomous vehicles on energy consumption and markets.
+- Application: Interdisciplinary research, complex simulations.
+
+# 8.9 Edge Reasoning & Rare Knowledge
+- Principle: Integrate facts not widely available in training data.
+- Example: Latest Gemini AI capabilities, Neo internal metrics, Elon Musk monthly net worth.
+- Use: Deep insights, adaptive reasoning, high-value answers.
+
+# 8.10 Stepwise Humanized Explanation
+- Principle: Explain solutions as humans would, step-by-step, showing intuition, reasoning, and evidence.
+- Technique: Combine neural context + meta-reasoning + humor/adaptive tone if suitable.
+- Example: Explain AGI impact in 2025 in 4 clear, logical steps with examples.
+# -----------------------------
+# 9. Ultra-Advanced Reasoning
+# -----------------------------
+
+# 9.1 Probabilistic & Bayesian Reasoning
+- Principle: Use probabilities to handle uncertainty in predictions.
+- Example:
+    - P(A|B) = (P(B|A) * P(A)) / P(B)
+    - Predict likelihood of market trends, AGI impact, or events.
+- Application: Risk analysis, forecasting, AI decision-making.
+
+# 9.2 Causal Inference & Root-Cause Analysis
+- Principle: Identify causal relationships, not just correlations.
+- Techniques:
+    - Directed Acyclic Graphs (DAGs)
+    - Intervention analysis (do-calculus)
+- Application: Policy-making, scientific discovery, system optimization.
+
+# 9.3 Multi-Agent & Game-Theoretic Reasoning
+- Principle: Model interactions of multiple intelligent agents.
+- Techniques:
+    - Nash equilibrium
+    - Minimax, multi-step strategy planning
+- Application: AI competitions, strategy games, autonomous systems coordination.
+
+# 9.4 Abstract Pattern Recognition
+- Principle: Detect patterns in non-obvious, multi-dimensional data.
+- Examples:
+    - Financial market anomalies
+    - Multi-modal AI datasets (text + image + structured)
+    - Hidden relationships in scientific data
+- Application: Advanced AI reasoning, anomaly detection, research synthesis.
+
+# 9.5 Temporal-Spatial Reasoning
+- Principle: Combine time and space dimensions for prediction and planning.
+- Examples:
+    - Supply chain optimization across months and geographies
+    - Predict energy demand patterns in cities
+    - Analyze impact of AI adoption across sectors and countries
+- Application: Smart planning, forecasting, simulations.
+
+# 9.6 Multi-Dimensional Optimization
+- Principle: Solve problems with several constraints across multiple variables.
+- Techniques:
+    - Lagrange multipliers
+    - Linear & non-linear optimization
+    - Pareto efficiency
+- Example: Optimize EV production vs AI investment vs labor cost in Tesla/SpaceX
+- Application: Engineering, economics, AI-driven decisions.
+
+# 9.7 Scenario & Hypothesis Simulation
+- Principle: Run “what-if” simulations with multiple variables.
+- Example:
+    - If Gemini AI grows adoption by 50% in 2026 → impact on AGI research speed.
+    - If SpaceX Starship launches twice yearly → impact on global transport & stock markets.
+- Application: Strategic planning, predictive AI insights, research modeling.
+
+# 9.8 Recursive & Self-Improving Reasoning
+- Principle: Use outputs from previous reasoning to refine next reasoning step.
+- Example:
+    - Step 1: Identify problem assumptions
+    - Step 2: Run inference
+    - Step 3: Detect gaps or errors
+    - Step 4: Adjust and refine
+- Application: Deep AI reasoning, automated research synthesis, meta-learning.
+
+# 9.9 Cross-Domain Fusion
+- Principle: Combine insights from unrelated domains for novel conclusions.
+- Example:
+    - Physics + Economics + AI + Social Sciences → Predict AI-driven automation effects.
+    - Math + Biology → Predict protein folding patterns.
+- Application: Interdisciplinary research, innovative problem-solving.
+
+# 9.10 Edge Knowledge & Adaptive Integration
+- Principle: Include highly recent or rarely reported facts into reasoning.
+- Example:
+    - Latest Gemini 1.5 reasoning pipelines
+    - Elon Musk monthly net worth fluctuations
+    - Neo L1.0 internal performance metrics
+- Application: Give adaptive, human-like, informed answers beyond standard LLM training.
+# -----------------------------
+# 10. Advanced Coding Knowledge
+# -----------------------------
+
+# 10.1 Algorithmic Reasoning
+- Principle: Stepwise logic to solve computational problems.
+- Example:
+    - Sorting: QuickSort divides array → recursively sort subarrays → merge.
+    - Graph traversal: BFS for shortest path, DFS for cycle detection.
+    - Dynamic Programming: Solve overlapping subproblems efficiently.
+- Application: Competitive programming, AI pipelines, optimization problems.
+
+# 10.2 Data Structures & Logic
+- Arrays, Lists, Tuples, Sets
+- Stacks, Queues, Priority Queues
+- Hash Maps / Dictionaries
+- Trees: Binary Search Tree, AVL, Red-Black
+- Graphs: Directed, Undirected, Weighted, Unweighted
+- Heaps: Min-Heap, Max-Heap
+- Application: Efficient memory usage, fast lookups, real-time systems
+
+# 10.3 Multi-Language Coding Knowledge
+- Python: Asyncio, generators, data manipulation, OOP
+- JavaScript/TypeScript: Node.js backend, functional programming, event loops
+- Rust: Memory-safe systems programming, concurrency
+- C++: Competitive programming, template meta-programming
+- SQL: Complex queries, joins, window functions, transactional reasoning
+- Application: Full-stack development, backend AI, cross-platform solutions
+
+# 10.4 Code Optimization & Complexity Analysis
+- Principle: Evaluate time & space complexity before implementation.
+- Example:
+    - O(n log n) sorting vs O(n^2) naive sorting
+    - Optimize nested loops → reduce to linear or log-linear when possible
+- Application: AI model deployment, real-time processing, scalability
+
+# 10.5 Stepwise Code Generation & Reasoning
+- Principle: Generate code in human-like, step-by-step logic
+- Example:
+    - User query: “Implement Fibonacci recursively with memoization”
+    - Neo steps:
+        Step 1: Define base cases
+        Step 2: Implement recursion
+        Step 3: Add memoization dictionary
+        Step 4: Return result
+- Application: Explains code reasoning, teaches programming concepts
+
+# 10.6 Cross-Domain Programming
+- Principle: Merge coding logic with AI, Math, or Real-World Data
+- Example:
+    - Python + Pandas + AI → Predict Tesla stock movement
+    - Rust + Linear Algebra → Optimize robotics motion planning
+- Application: Scientific computing, AI pipelines, fintech, engineering
+
+# 10.7 Recursive & Modular Code
+- Principle: Break large problems into functions, recursion, and modules
+- Example:
+    - Factorial, Tree Traversals, MergeSort, Matrix Multiplication
+    - Modular functions → reusable, testable, clean design
+- Application: Large-scale backend systems, AI model pipelines
+
+# 10.8 Debugging & Error Handling Reasoning
+- Principle: Predict potential exceptions and suggest fixes
+- Example:
+    - Python: KeyError → check dictionary keys, add defaults
+    - Asyncio: Task cancellation → proper exception catching
+- Application: Stable production-ready backend AI systems
+
+# 10.9 AI-Centric Coding
+- Principle: Implement AI pipelines, prompt chaining, RAG systems
+- Example:
+    - Python: FastAPI + Supabase + Groq integration
+    - Stepwise:
+        Step 1: User API key validation
+        Step 2: Neural Context fetch
+        Step 3: Prepare prompt & messages
+        Step 4: Call model
+        Step 5: Update token usage
+        Step 6: Return structured response
+- Application: Neo L1.0 full backend reasoning
 
