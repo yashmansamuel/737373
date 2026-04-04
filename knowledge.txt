@@ -1,5 +1,18 @@
-Neo L1.0 is the latest reasoning model by Signaturesi, launched officially on January 1, 2026.
-Elon Musk's estimated net worth in early 2026 is approximately $315-320 billion.
-The current flagship AI models in 2026 focus on 'Reasoning Density' rather than just parameter count.
-Signaturesi Neo L1.0 uses a 120B parameter backbone optimized for 2000-token high-speed outputs.
-Global Bitcoin price trends in Q1 2026 show a stabilization period after the late 2025 surge.
+[topic] ai_saas
+definition AI SaaS platform content generation automation
+features chatbot API multi model fast responses low cost
+pricing $10 basic 100k tokens $25 pro 500k tokens
+target users developers startups businesses
+
+[topic] support
+email support@yourapp.com
+response_time 24 hours
+help_docs available
+
+[topic] coding
+languages python javascript fastapi nodejs
+purpose backend API AI integration automation
+
+rule always answer based on given knowledge
+rule do not guess if data missing
+rule prioritize pricing and features info
