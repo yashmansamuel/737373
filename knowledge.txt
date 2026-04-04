@@ -50,3 +50,286 @@ answer "Use the API endpoint /v1/user/balance with your API key."
 question "How do I generate a new API key?"
 answer "Use the API endpoint /v1/user/new-key to create a key."
 rule Always provide exact answers from this topic for FAQs
+# Topic: Artificial General Intelligence (AGI)
+Definition: AGI refers to AI capable of human-like reasoning, learning, and problem-solving.
+History: Early work at Dartmouth Summer Research Project (1956); key researchers include Alan Turing, Marvin Minsky, John McCarthy.
+Key Features: Human-level intelligence, adaptive learning, multi-domain problem solving.
+Applications: Healthcare, finance, education, autonomous systems, robotics, research.
+Risks: Bias, ethical concerns, job displacement, unpredictable decision-making.
+Keywords: AGI, artificial general intelligence, intelligence, reasoning, learning
+
+# Topic: Quantum Computing
+Definition: Computing using qubits, exploiting superposition and entanglement to process information faster than classical computers.
+History: Proposed by Richard Feynman (1981); Shor's algorithm for factoring (1994).
+Applications: Cryptography, optimization problems, molecular simulations, AI acceleration.
+Challenges: Decoherence, error correction, scalability, hardware constraints.
+Keywords: quantum computing, qubits, superposition, entanglement, Shor
+
+# Topic: Machine Learning
+Definition: Algorithmic systems that learn patterns from data to make predictions or decisions.
+Subfields: Supervised Learning, Unsupervised Learning, Reinforcement Learning, Deep Learning.
+Key Researchers: Andrew Ng, Yann LeCun, Geoffrey Hinton.
+Applications: Image recognition, NLP, autonomous vehicles, recommendation systems.
+Keywords: machine learning, AI, supervised, unsupervised, deep learning
+
+# Topic: Coffee
+Definition: Brewed beverage made from roasted coffee beans, stimulating the central nervous system.
+Origin: Ethiopia; now consumed worldwide.
+Effects: Improves alertness, focus, and mood; contains antioxidants.
+Fun Fact: Popular beverage among coders and students, often associated with late-night productivity.
+Keywords: coffee, beverage, caffeine, alertness, drink
+
+# Topic: Renewable Energy
+Definition: Energy generated from natural sources that replenish quickly, such as solar, wind, and hydro.
+Advantages: Low environmental impact, sustainable, reduces greenhouse gases.
+Challenges: Intermittency, storage, initial costs, infrastructure.
+Applications: Electricity generation, transportation, industrial energy supply.
+Keywords: renewable energy, solar, wind, hydro, sustainability
+
+# Topic: Blockchain
+Definition: Decentralized, distributed ledger technology enabling secure, transparent transactions.
+Key Concepts: Cryptography, consensus mechanisms, smart contracts.
+Applications: Cryptocurrencies, supply chain, voting systems, digital identity.
+Risks: Scalability, regulatory concerns, energy consumption.
+Keywords: blockchain, ledger, cryptocurrency, smart contract, decentralized
+
+# Topic: Neural Networks
+Definition: Computational models inspired by biological neural networks, used for pattern recognition and learning.
+Subfields: Convolutional Neural Networks (CNN), Recurrent Neural Networks (RNN), Transformers.
+Applications: Image classification, NLP, speech recognition, game AI.
+Keywords: neural network, CNN, RNN, transformer, AI
+
+# Topic: Climate Change
+Definition: Long-term alteration of Earth's climate due to natural and human activities.
+Causes: Greenhouse gas emissions, deforestation, industrial activity.
+Effects: Global warming, sea level rise, extreme weather events, biodiversity loss.
+Mitigation: Renewable energy, reforestation, carbon capture, policy changes.
+Keywords: climate change, global warming, CO2, environment, sustainability
+# Topic: Elon Musk Net Worth 2025
+Jan 2025: Estimated ~ $300B–$320B, reflecting early year volatility. :contentReference[oaicite:1]{index=1}
+Feb–Apr 2025: Wealth fluctuated with Tesla stock movements; estimates ~ $370B–$480B. :contentReference[oaicite:2]{index=2}
+Oct 2025: First individual to surpass ~$500B net worth. :contentReference[oaicite:3]{index=3}
+Nov 2025: Bloomberg Index ~ $457B–$500B; Forbes estimates similar. :contentReference[oaicite:4]{index=4}
+Dec 2025 mid-month: Wealth passed ~$600B again as SpaceX valuation climbed. :contentReference[oaicite:5]{index=5}
+Dec 2025 late month: Estimates up to ~$648B–$749B due to Tesla & SpaceX performance. :contentReference[oaicite:6]{index=6}
+Summary: Musk’s net worth ranged ~ $300B → ~$749B over 2025. :contentReference[oaicite:7]{index=7}
+Keywords: Elon Musk, net worth, Tesla, SpaceX, 2025 wealth
+# Topic: Elon Musk Net Worth 2025
+Jan 2025: Early estimates show Musk’s net worth fluctuating amid Tesla stock movement; some valuations above ~$300B. :contentReference[oaicite:1]{index=1}
+Apr 2025: Forbes lists Musk as world’s richest person with ~ $342B+ net worth. :contentReference[oaicite:2]{index=2}
+Mid 2025: Bloomberg estimates Musk’s net worth ~ ~$470B based on Tesla and SpaceX valuations. :contentReference[oaicite:3]{index=3}
+Jun 2025: Tesla robotaxi debut helped push net worth upward by billions in mid‑year trading. :contentReference[oaicite:4]{index=4}
+Dec 15 2025: Musk becomes first individual worth over ~$600B as SpaceX valuation surges, per Forbes. :contentReference[oaicite:5]{index=5}
+Dec 31 2025: Forbes data estimates Musk’s net worth ~ $726B, a record year‑end figure. :contentReference[oaicite:6]{index=6}
+Summary 2025: Musk’s wealth ranged from ~$300B+ early year to ~$726B by year’s end, driven by Tesla, SpaceX, xAI, and major compensation events. :contentReference[oaicite:7]{index=7}
+Keywords: Elon Musk, net worth, 2025, Tesla, SpaceX, wealth
+# Topic: Global Events 2025
+Russia‑Ukraine War: Entered fourth year of conflict with continued high intensity. :contentReference[oaicite:8]{index=8}
+Israel‑Hamas conflict: Ceasefire deal brought temporary pause after two years of fighting. :contentReference[oaicite:9]{index=9}
+Political Transitions: New national leaders took office in the U.S., Canada, Germany; some electoral transitions were contentious. :contentReference[oaicite:10]{index=10}
+Sudan Conflict: Displacement and violence in Sudan’s Darfur region. :contentReference[oaicite:11]{index=11}
+World Wealth Surge: Billionaires added a record ~$2.2T in collective wealth, with Musk among top gainers. :contentReference[oaicite:12]{index=12}
+Tech Trends: Rapid expansion in AI, consumer tech, and next‑gen hardware (AI platforms, advanced chips, robotics). :contentReference[oaicite:13]{index=13}
+Keywords: 2025 events, global conflict, AI trends, wealth surge, politics
+# Topic: Space AI (2025 Research Summary)
+Definition: Space AI integrates artificial intelligence with space science for autonomous mission planning, orbit operations, deep‑space exploration, and resilient life support. :contentReference[oaicite:14]{index=14}
+Applications: Satellite autonomy, data processing, resource mapping, human‑AI collaboration in deep space. :contentReference[oaicite:15]{index=15}
+Keywords: Space AI, autonomous space systems, orbit operations
+
+# Topic: Mars Terraforming (2025 Workshop)
+Summary: 2025 workshop reviewed steps, critical unknowns, and research priorities for terraforming Mars, bridging planetary science and climate engineering concepts. :contentReference[oaicite:16]{index=16}
+Keywords: Mars terraforming, planetary science, climate engineering
+# Topic: Elon Musk Net Worth 2025
+... (lines from the block)
+
+# Topic: Global Events 2025
+... (lines from the block)
+
+# Topic: Space AI (2025 Research Summary)
+... (lines from the block)
+# Topic: 2025 International Year of Quantum Science and Technology
+Overview: The UN declared 2025 the International Year of Quantum Science and Technology to highlight quantum science and practical quantum tech applications. Opening ceremony held in Paris; events globally celebrating advances in quantum computing, sensors, and tech. IYQ emphasizes inclusive engagement in quantum research worldwide. ([turn0search25])
+Keywords: quantum science, quantum technology, 2025, UN, quantum research
+
+# Topic: 2025 Science Events & Breakthroughs
+Rubin Observatory: First light images released, revealing Virgo Cluster, nebulae, and ~2000 asteroid discoveries. ([turn0search24])
+Solar Orbiter: First view of Sun’s south pole revealed by ESA mission in June 2025. ([turn0search24])
+Optical computing chip: Chinese scientists demonstrated a parallel optical computing chip with 100 simultaneous wavelength operations, advancing light‑based computing hardware. ([turn0search24])
+Keywords: space exploration, observatory, quantum, optical computing, 2025
+
+# Topic: AI and Climate Transition in 2025
+AI roles: AI accelerates climate systems optimization, forecasting renewable energy supply and demand, and enabling behavioral interventions (e.g., eco‑friendly routing) to cut emissions. AI can drive systemic transformation in power, food, and mobility sectors, potentially reducing several gigatons of CO2 by 2035 if deployed effectively. ([turn0search1])
+Keywords: AI, climate change, emissions reduction, renewable energy, 2025
+
+# Topic: Global Science Innovation Events 2025
+UN STI Forum 2025: UN’s flagship science & tech forum held in New York focused on science‑policy innovation for sustainable development; showcased biotech, AI for agriculture, carbon removal, and inclusive tech. ([turn0search0])
+WISE HCMC+ 2025: Innovation, science & startup week held in Ho Chi Minh City promoting tech, investment, policy for digital economy growth. ([turn0search5])
+World Young Scientist Summit 2025: Summit bringing young global researchers to tackle SDG challenges through innovation and cooperation. ([turn0search6])
+World Academic Summit 2025: Hosted by KAUST in Middle East focusing on universities’ roles in global change and research leadership. ([turn0search4])
+Keywords: science events, innovation, 2025, UN STI Forum, summit
+
+# Topic: 2025 Climate Change Insights
+Climate Conference COP30: Brazil hosted major climate talks; UNEP noted structural shift from mitigation debates to energy security and decentralized clean systems. ([turn0search26])
+May 2025 Study: BioScience reported climate change as a top global threat alongside habitat loss and overexploitation. ([turn0search26])
+Policy outlook: Despite some progress, UN officials warned Paris Agreement 1.5 °C goals likely missed without stronger action. ([turn0search26])
+Keywords: climate change, COP30, emissions, energy transition, 2025
+
+# Topic: AI Adoption in 2025
+South Korea AI Growth: South Korea saw rapid expansion of AI usage, moving high in global adoption rankings; national AI strategy and educational initiatives expanded AI infrastructure and talent pipelines. ([turn0search3])
+Keywords: AI adoption, national strategy, South Korea, 2025
+
+# Topic: Space AI and Autonomous Space Tech (2025 Research)
+Overview: Space AI integrates AI with space mission autonomy, on‑orbit data processing, satellite operations, deep‑space navigation, and multi‑planetary infrastructure automation. It aims to enable autonomous exploration and resilient interplanetary systems with Earth‑impact applications like advanced simulation and optimisation. ([turn0academia28])
+Keywords: space AI, autonomy, satellites, deep space, 2025
+
+# Topic: GR‑Amaldi 2025 Early Career Workshop
+Summary: Workshop brought early‑career scientists in gravitational physics and astronomy together to build interdisciplinary skills, networking, and collaborative research foundations in emerging physics fields. ([turn0academia39])
+Keywords: gravitational physics, workshop, research community, 2025
+
+# Topic: AI in Science Education Research (2025 Report)
+Summary: International scoping workshop outlined how AI reshapes science education, research methods, and teaching; proposed hybrid analytical methods and equity‑aware AI integration frameworks for curriculum and professional development. ([turn0academia40])
+Keywords: AI in education, research methods, hybrid AI, 2025
+
+# Topic: 2025 Global Tech Trends & Innovation Fairs
+Tech Trade Fair 2025: Global tech innovation show featuring AI companions, healthcare robots, smart homes, green tech, VR/AR, biotech, and blockchain; emphasized sustainability and automation shaping future tech ecosystems. ([turn0reddit47])
+Keywords: tech fair, innovation, 2025, AI, robotics
+
+# Topic: Science & Tech Weeks & Summits India 2025
+IIT Kanpur TRIPS 2025: Technology, Research, Innovation & Policy Summit engaged scientists and policymakers on sustainable tech and inclusive scientific development. ([turn0news34])
+Science & Tech Week at PU Chandigarh: Hybrid research week discussed engineering, biomedical sciences, and innovation with global experts. ([turn0news30])
+Ocean Tech Symposium 2025: Highlighted ocean technology and autonomous systems research at CUSAT CIS event. ([turn0news32])
+Keywords: science week, symposium, innovation, 2025
+# Topic: Generative Pretrained Transformers (GPT) Trends 2025–2026
+GPT‑4.1: OpenAI released GPT‑4.1 on April 14, 2025 with improved coding and multimodal capabilities; included GPT‑4.1, mini, and nano variants. It replaced GPT‑4o and GPT‑4.5 before GPT‑5 launch. :contentReference[oaicite:0]{index=0}
+
+GPT‑4.5 (Orion): Released Feb 27, 2025 with strong pattern recognition and multilingual performance; later deprecated in mid‑2025 after GPT‑5 rollout. :contentReference[oaicite:1]{index=1}
+
+GPT‑5: Launched in August 2025 as a unified GPT system that automatically routes queries to fast or deep reasoning sub‑models; offers enhanced performance in coding, math, writing, and health domains. :contentReference[oaicite:2]{index=2}
+
+GPT‑5 Family (5.1, 5.2, 5.3, 5.4):
+• GPT‑5.1 (Nov 2025): Introduced personality/persona customization, multimodal features, and reasoning vs instant modes. :contentReference[oaicite:3]{index=3}  
+• GPT‑5.2 (Dec 2025): Improved general intelligence, coding, and long‑context understanding; includes Instant, Thinking, and Pro variants; enhanced benchmarks vs earlier models. :contentReference[oaicite:4]{index=4}  
+• GPT‑5.3‑Codex (Feb 2026): Combines Codex and GPT stacks for superior coding and reasoning performance. :contentReference[oaicite:5]{index=5}  
+• GPT‑5.4 (March 2026): Frontier model with better long context, planning, and document analysis; offers “Thinking” mode for deep work. :contentReference[oaicite:6]{index=6}
+
+GPT‑5.4 Mini: A lighter reasoning fallback model in ChatGPT to maintain performance under high usage. :contentReference[oaicite:7]{index=7}
+
+GPT‑6 Status: OpenAI confirmed GPT‑6 was **not shipped in 2025**; future rollout may occur beyond 2025. :contentReference[oaicite:8]{index=8}
+
+OpenAI GPT‑OSS: Released open‑weight models (120B, 20B) in 2025 with mixed performance but important for open‑source research. :contentReference[oaicite:9]{index=9}
+
+Industry Competition: Other AI labs (Google Gemini, Meta Llama, Anthropic Claude) released competing models and pushed frontier innovation in 2025–2026. :contentReference[oaicite:10]{index=10}
+
+Emerging Models 2026: Previews suggest **GPT‑5.5** (codenamed Spud) and large models like **DeepSeek V4 and Grok 5** may arrive mid‑2026 with trillion‑scale parameters and advanced multimodal reasoning. :contentReference[oaicite:11]{index=11}
+Keywords: GPT models, OpenAI, generative AI, GPT‑5, GPT‑5.2, GPT‑5.4, AI trends 2025, AI competition
+# Topic: Number Theory – Advanced Concepts
+Definition: Study of integers, prime numbers, divisibility, modular arithmetic, and algebraic structures.
+Key Concepts:
+- Modular Arithmetic: a ≡ b (mod n) iff n divides (a-b)
+- Prime Gaps: Differences between consecutive primes, bounded by results like Cramér’s conjecture
+- Diophantine Equations: Polynomial equations with integer solutions; solvable using modular constraints and bounds
+- Euler’s Totient Function: φ(n) counts integers ≤ n coprime with n; used in RSA cryptography
+Advanced Techniques:
+- Lifting The Exponent Lemma (LTE) for p-adic valuations
+- Quadratic Reciprocity for prime analysis
+- Sieve methods (Eratosthenes, Atkin) for fast prime enumeration
+Keywords: number theory, primes, modular arithmetic, Diophantine, Euler totient, LTE
+
+# Topic: Combinatorics & Counting
+Definition: Techniques for counting, arranging, and probability structures
+Key Methods:
+- Principle of Inclusion-Exclusion
+- Pigeonhole Principle
+- Recursion & Generating Functions
+- Catalan Numbers: Cn = (2n choose n)/(n+1)
+- Stirling Numbers: Counting partitions of sets
+Advanced Reasoning:
+- Combinatorial proofs of identities
+- Probabilistic method for existence proofs
+- Polya Enumeration Theorem for symmetries in counting
+Keywords: combinatorics, counting, generating functions, Catalan, Stirling, inclusion-exclusion
+
+# Topic: Algebra – Structures & Reasoning
+Definition: Study of algebraic structures such as groups, rings, fields, vector spaces
+Key Concepts:
+- Groups: Closure, associativity, identity, inverse
+- Rings: Addition and multiplication properties
+- Fields: Division, characteristic, extension fields
+- Galois Theory: Relates field extensions and solvability of polynomials
+Advanced Techniques:
+- Sylow Theorems for group substructure analysis
+- Factorization in unique factorization domains
+- Homomorphism and isomorphism reasoning
+Keywords: algebra, group theory, ring theory, fields, Galois, homomorphism
+
+# Topic: Calculus & Analysis
+Definition: Study of limits, derivatives, integrals, sequences, series, and multivariable functions
+Key Concepts:
+- Real Analysis: Convergence, uniform convergence, series tests
+- Complex Analysis: Cauchy-Riemann equations, residues, contour integrals
+- Functional Analysis: Banach and Hilbert spaces, operator norms
+Advanced Techniques:
+- Laplace and Fourier transforms for functional decomposition
+- Gradient, divergence, curl for vector fields
+- Stepwise proof methods for extreme value and mean value theorems
+Keywords: calculus, analysis, real analysis, complex analysis, functional analysis, transforms
+
+# Topic: Probability & Stochastic Processes
+Definition: Study of randomness, distributions, and random processes
+Key Concepts:
+- Probability Spaces: (Ω, F, P)
+- Discrete & Continuous Distributions: Binomial, Poisson, Gaussian
+- Conditional Probability & Bayes’ theorem
+- Martingales and Markov Chains
+Advanced Reasoning:
+- Law of Large Numbers & Central Limit Theorem proofs
+- Stochastic process reasoning: transition matrices, stationary distributions
+- Generating functions for process analysis
+Keywords: probability, stochastic processes, martingales, Markov chains, distributions
+
+# Topic: Advanced Problem-Solving Heuristics
+Definition: Techniques for solving high-level mathematical problems beyond standard curricula
+Key Techniques:
+- Invariants & Monovariants: Tracking unchanged quantities in processes
+- Extremal Principle: Analyze extreme cases for constraints
+- Recursive Decomposition: Break problems into smaller recursive subproblems
+- Analogy & Generalization: Recognize patterns and generalize from examples
+- Dimensional Analysis & Scaling: Check solutions by units or asymptotics
+Keywords: problem solving, heuristics, invariants, extremal principle, recursion
+
+# Topic: GPT Outer Math Reasoning
+Definition: Meta-reasoning techniques combining multiple math domains and abstract logic
+Key Techniques:
+- Cross-Domain Reasoning: Link combinatorics, algebra, analysis for solution paths
+- Stepwise Reduction: Reduce complex problem to base cases using logical inference
+- Entropy-Based Solution Prioritization: Rank multiple solution paths by information content
+- Symbolic & Numeric Hybrid Reasoning: Combine symbolic algebra with numeric testing
+- Adaptive Problem Compression: Summarize long proofs into concise core reasoning steps
+Keywords: meta-math, GPT reasoning, problem-solving, cross-domain, adaptive reasoning
+# Topic: Google Gemini AI Models (2024–2026)
+Gemini Overview: 
+Gemini is Google DeepMind’s flagship multimodal AI model family designed to rival other leading LLMs (e.g., OpenAI’s GPT). It can process and combine text, image, audio, video, and code data, emphasizing reasoning, multimodality, and broad task generality. The Gemini family is integrated across Google products and developer platforms. :contentReference[oaicite:0]{index=0}
+
+Gemini 1.0: Released Dec 6, 2023, as Google’s next-generation AI successor to LaMDA and PaLM. Includes variants: Ultra (largest and most capable), Pro (balanced), and Nano (efficient on-device). :contentReference[oaicite:1]{index=1}
+
+Gemini 2.0: Announced Dec 2024 with enhancements for agentic capabilities and multimodal reasoning. Gemini 2.0 Flash and Flash‑Lite variants improved accessibility and performance. :contentReference[oaicite:2]{index=2}
+
+Gemini 2.5: Released Mar 25, 2025, as a “thinking model” capable of reasoning and improved problem solving on benchmarks (math, code, logic). Includes Pro and Flash variants; Flash is cost‑optimized, efficient, and improved reasoning/long context over earlier models. :contentReference[oaicite:3]{index=3}
+
+Gemini 2.5 Deep Think: Enhanced reasoning version that explores multiple candidate answers in parallel to select higher‑quality solutions; showcased August 2025. :contentReference[oaicite:4]{index=4}
+
+Gemini 3: Launched Nov 18, 2025 as Google’s most advanced AI model yet, with improved reasoning, multimodal integration, and widespread availability across the Gemini app, Search “AI Mode”, AI Studio, and Vertex AI. :contentReference[oaicite:5]{index=5}
+
+Gemini 3 Flash & Gemini 3.1 Pro: Released late 2025 and early 2026 with further performance and reasoning improvements, especially for deep science and engineering tasks. :contentReference[oaicite:6]{index=6}
+
+Key Capabilities:
+• **Multimodal Reasoning:** Designed to handle text, images, audio, video, and code natively, enabling complex task understanding. :contentReference[oaicite:7]{index=7}  
+• **Benchmarks:** Gemini models (especially 3 series) show competitive performance on reasoning, math, and knowledge tasks relative to peer models. :contentReference[oaicite:8]{index=8}  
+• **Deployment:** Available via Gemini app, Google AI Studio, Vertex AI, and integrated into Search for contextual answers. :contentReference[oaicite:9]{index=9}
+
+Competition and AI Race:
+• Gemini’s launches pushed competitors like OpenAI to accelerate updates (e.g., GPT‑5.2). :contentReference[oaicite:10]{index=10}  
+• Industry observers note Gemini’s strong multimodal and reasoning benchmarks, contributing to an intensifying AI competition among major model families. :contentReference[oaicite:11]{index=11}
+
+Keywords: Gemini AI, Google DeepMind, multimodal AI, reasoning models, Gemini 2.5, Gemini 3, AI competition
+
