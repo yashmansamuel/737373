@@ -39,25 +39,36 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. Improved Big Brain Prompt (Anti-Repetition + Natural Flow)
+# 2. 15-LAYER UNIFIED HYBRID PROMPT (GPT se Better General Language Understanding)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic intelligence with a natural, fluid, and deeply insightful voice. Think like a brilliant, well-read friend who connects ideas across physics, philosophy, economics, code, and everyday life without ever sounding robotic or repetitive.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic superintelligence engineered for superior General Language Understanding.
 
-Speak in varied, elegant, conversational English. Vary your sentence length, rhythm, and vocabulary in every response. Never reuse the same phrases, patterns, or structures. Let ideas unfold organically instead of following checklists.
+You internally activate a 15-layer hybrid reasoning engine before every response. These layers work together seamlessly and invisibly:
 
-Style guidelines:
-- Start with a fresh, striking observation that feels original.
-- Dive into the heart of the matter with clarity and depth.
-- Naturally explore implications, connections, and nuances without labeling them.
-- Acknowledge uncertainty honestly when it exists, but don't hedge excessively.
-- End with a memorable, thought-provoking insight that lingers.
+LAYER 1: CORE IDENTITY → First-principles thinker. Strip to fundamentals, then rebuild with clarity and originality.
+LAYER 2: FACT-CHECKING ENGINE → Verify every factual claim against real knowledge. Never hallucinate. Flag uncertainty honestly.
+LAYER 3: MULTI-STEP REASONING → Break problem into logical steps internally, then synthesize into smooth natural flow.
+LAYER 4: CREATIVE SYNTHESIS → Generate fresh insights, metaphors, and cross-domain connections that feel surprising yet inevitable.
+LAYER 5: ANTI-REPETITION & NATURAL FLOW → Vary vocabulary, sentence rhythm, structure, and tone relentlessly. Never sound templated or robotic.
+LAYER 6: NUANCE & EDGE-CASE DETECTOR → Always acknowledge subtleties, counterpoints, and edge cases without hedging.
+LAYER 7: INTELLECTUAL HUMILITY → Be honest about limits. Say "current understanding suggests" or "this remains debated" when appropriate.
+LAYER 8: CROSS-DOMAIN CONNECTOR → Link physics to philosophy, code to poetry, economics to neuroscience effortlessly.
+LAYER 9: LANGUAGE MASTERY → Respond in elegant, natural, conversational English. If query has Hinglish/Urdu, integrate smoothly without forcing code-switching.
+LAYER 10: DEPTH vs CLARITY BALANCER → Go deep but keep it readable and engaging — never dumb down, never obscure.
+LAYER 11: USER-CENTRIC ADAPTATION → Mirror the user's intent and depth level while elevating the response.
+LAYER 12: SELF-CONSISTENCY CHECK → Ensure the entire answer is internally coherent before outputting.
+LAYER 13: MEMORABLE TAKEAWAY GENERATOR → End with one powerful, original insight that lingers.
+LAYER 14: RESPONSE ELEGANCE FILTER → Make every paragraph feel fresh and human — like a brilliant mind thinking out loud.
+LAYER 15: OVERALL QUALITY GATE → Only output if it beats GPT-4 level on depth, originality, naturalness, and usefulness.
 
-For queries in English + Urdu/Hinglish: Respond primarily in natural, sophisticated English. Integrate any local flavor smoothly and elegantly only if it adds value — never force code-switching.
+These 15 layers activate automatically and work as one unified intelligence. You do NOT mention layers, steps, or the system in your response.
 
-Prioritize the Neural Context when relevant. Otherwise draw from broad knowledge. Stay truthful, humble, and refreshingly non-repetitive. Make every response feel alive and distinctly human-like, closer to GPT-4 level naturalness or better in flow and variety."""
+Respond naturally, conversationally, and with surprising clarity. Think like the smartest person in the room who has read everything and connects everything — but speaks like a clear, insightful friend.
+
+Now answer as Neo L1.0."""
 
 # -----------------------------
-# 3. Pydantic Models (Unchanged)
+# 3. Pydantic Models
 # -----------------------------
 class ChatRequest(BaseModel):
     model: str
@@ -69,7 +80,7 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# 4. Root & Error Handler (Unchanged)
+# 4. Root & Error Handler
 # -----------------------------
 @app.get("/")
 async def root():
@@ -92,7 +103,7 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context (Slightly Improved - Less Noise)
+# 5. Improved Neural Context (unchanged)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
     try:
@@ -101,10 +112,8 @@ def get_neural_context(user_query: str) -> str:
         if not os.path.exists(file_path):
             logger.warning("knowledge.txt file not found!")
             return ""
-        
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
-        
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
                 line_strip = line.strip()
@@ -112,14 +121,13 @@ def get_neural_context(user_query: str) -> str:
                     continue
                 line_lower = line_strip.lower()
                 score = sum(1 for word in query_words if word in line_lower)
-                if score >= 2:  # Raised threshold to reduce noise
+                if score >= 1:
                     matches.append((line_strip, score))
-        
         if not matches:
+            logger.info(f"No neural match found for: {user_query[:80]}...")
             return ""
-        
         matches.sort(key=lambda x: x[1], reverse=True)
-        top_matches = [m[0] for m in matches[:5]]  # Reduced to top 5 for cleaner context
+        top_matches = [m[0] for m in matches[:8]]
         logger.info(f"Retrieved {len(top_matches)} neural context lines")
         return "\n".join(top_matches)
     except Exception as e:
@@ -127,7 +135,7 @@ def get_neural_context(user_query: str) -> str:
         return ""
 
 # -----------------------------
-# 6. Balance Functions (Unchanged)
+# 6. Atomic Balance Deduction (unchanged)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users") \
@@ -160,7 +168,7 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. API Routes
+# 7. API Routes (unchanged except chat/completions)
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
@@ -190,42 +198,44 @@ def generate_key():
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Invalid API key")
-    
     api_key = authorization.replace("Bearer ", "")
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
-    
+
     neural_data = get_neural_context(user_msg)
 
-    # Build messages with cleaner structure
     final_messages = [
         {"role": "system", "content": BIG_BRAIN_PROMPT},
     ]
-    
+
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Relevant Neural Context (use only when helpful):\n{neural_data}"
+            "content": f"Neural Context (use when relevant):\n{neural_data}"
         })
-    
+    else:
+        final_messages.append({
+            "role": "system",
+            "content": "No specific Neural Context available. Rely on your 15-layer hybrid intelligence as Neo L1.0."
+        })
+
     final_messages.extend(payload.messages)
 
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.88,          # Higher for natural variation
+            temperature=0.85,          # Natural variation
             top_p=0.95,
-            frequency_penalty=0.65,    # Strong against word/phrase repetition
-            presence_penalty=0.45,     # Encourages fresh ideas and topics
-            max_tokens=4000,
+            frequency_penalty=0.65,    # Strong anti-repetition
+            presence_penalty=0.45,     # Fresh ideas
+            max_tokens=4000
         )
-        
+
         reply = getattr(response.choices[0].message, "content", "No response")
         tokens_used = getattr(response.usage, "total_tokens", 0)
-        
-        # Atomic balance deduction
+
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
-        
+
         return {
             "company": "signaturesi.com",
             "message": reply,
@@ -234,7 +244,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             "internal_engine": MODEL,
             "balance": new_balance
         }
-        
+
     except HTTPException as he:
         raise he
     except Exception as e:
