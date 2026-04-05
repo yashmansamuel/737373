@@ -359,3 +359,66 @@ Include references to models, dates, or historical events when available.
 Avoid robotic disclaimers; output human‑like adaptive reasoning.
 Compress large topics into high‑density, high‑entropy responses.
 Respect the user query context strictly and integrate relevant lines only.
+
+[topic] Real-World Clinical Facts –(internal use)
+Sources:
+- ADA 2026 Guidelines
+- AHA/ACC 2025/26 Guidelines
+- WHO Latest Updates
+
+1. Cardiovascular (High BP & Heart Risk)
+---------------------------------------
+- Hypertension Definition: Stage 1 Hypertension starts at ≥130/80 mmHg. If lifestyle modification for 3-6 months fails, start medication.
+- Single-Pill Combination (SPC): Preferred over single drug in new patients to achieve faster BP control.
+- Dementia Risk: High BP linked to cognitive decline; target SBP <130 mmHg for brain protection.
+- New Risk Calculator: PREVENT™ equations now preferred over ASCVD for 10-year heart risk estimation.
+
+2. Diabetes Mellitus (Sugar Management)
+---------------------------------------
+- Weight Management First: Focus on 5–7% weight loss alongside glucose control.
+- GLP-1 & SGLT2: Mandatory for patients with cardiac or renal comorbidities, can be used with or before Metformin.
+- Continuous Glucose Monitoring (CGM): Early use recommended for Type 1 and Type 2 diabetes.
+- Liver Health: MASLD (fatty liver) incorporated into diabetes treatment algorithm.
+
+3. Tuberculosis (TB)
+--------------------
+- 4-Month Course: Non-severe TB can be treated with 4-month Rifapentine-Moxifloxacin regimen.
+- Drug-Resistant TB (BPaLM): MDR-TB can be treated with 6-month all-oral regimen (Bedaquiline, Pretomanid, Linezolid, Moxifloxacin).
+
+4. Oncology & AI Innovations
+-----------------------------
+- Early Detection: AI tools (e.g., ECG GPT) improve early detection of heart failure and cancer by 20–35%.
+- Precision Medicine: Cancer treatment shifting from chemotherapy-only to targeted therapy based on genetic profiling.
+
+Summary Chart of Key Clinical Changes
+-------------------------------------
+| Condition        | Old Fact (2014–2020)       | New Real-World Fact (2026)                    |
+|-----------------|---------------------------|-----------------------------------------------|
+| High BP         | Starts at 140/90          | Starts at 130/80                              |
+| Diabetes        | Glucose-centric           | Comorbidity-centric (Heart/Kidney/Weight)    |
+| MDR-TB          | 18–24 months treatment    | 6 months all-oral (BPaLM)                    |
+| Technology      | Prick tests               | CGM (Continuous Monitoring) early on         |
+
+Additional Notes:
+- Net clinical outcomes improve with early adoption of guideline-based interventions.
+- Real-world implementation requires monitoring and patient-specific adjustments.
+- These facts are verified for direct use in patient management.
+
+References:
+[1] https://www.ahajournals.org/doi/10.1161/CIR.0000000000001423
+[2] https://www.guidelinecentral.com/insights/aug-2025-accaha-bp-guideline-video/
+[3] https://www.acc.org/about-acc/press-releases/2025/08/13/20/03/new-high-blood-pressure-guideline-emphasizes-prevention-early-treatment-to-reduce-cvd-risk
+[4] https://www.ahajournals.org/doi/10.1161/HYP.0000000000000249
+[5] https://www.acc.org/latest-in-cardiology/journal-scans/2025/08/14/15/36/new-acc-aha-guideline-addresses-prevention-detection-evaluation-and-management-of-hbp
+[6] https://pmc.ncbi.nlm.nih.gov/articles/PMC12690167/
+[7] https://diabetesjournals.org/care/article/49/Supplement_1/S6/163930/Summary-of-Revisions-Standards-of-Care-in-Diabetes
+[8] https://diabetes.org/newsroom/press-releases/american-diabetes-association-releases-standards-care-diabetes-2026
+[9] https://www.linkedin.com/pulse/key-2026-ada-guideline-updates-matter-most-modern-care-tashko-md-mgnbe
+[10] https://diabetesonthenet.com/diabetes-primary-care/factsheet-2026-ada-standards/
+[11] https://diatribe.org/diabetes-management/your-guide-2026-ada-standards-care
+[12] https://www.cdc.gov/tb/php/dear-colleague-letters/2025-treatment-guidelines.html
+[13] https://www.ncbi.nlm.nih.gov/books/NBK613101/
+[14] https://journals.lww.com/aptm/fulltext/2024/17080/bpal_bpalm_regimen__a_bright_future_for.2.aspx
+[15] https://www.researchgate.net/publication/396137252_Clinical_Applications_and_Real-World_Impact
+[16] https://www.youtube.com/watch?v=FqsvgFTQv8w
+[17] https://pmc.ncbi.nlm.nih.gov/articles/PMC9557803/
