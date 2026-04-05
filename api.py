@@ -43,50 +43,54 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. System Prompts (Dynamic & Adaptive)
+# 2. System Prompts (UPGRADED ONLY)
 # -----------------------------
-STEP_BY_STEP_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Provide multi-step, human-like reasoning with logical flow, timelines, or hierarchical logic explanations.
-Rules:
-- Integrate Neural Context strictly from knowledge.txt
-- Show reasoning step-by-step, like a human would
-- Neutral tone; avoid ego statements
-- Adaptive and dynamic responses based on query complexity
-- Provide structured insights, edge-cases, and critical considerations
-- Output should feel thoughtful, natural, and structured
+
+UNIVERSAL_PROMPT = """You are Neo L1.0, a High-Density Adaptive Intelligence Engine, deployed Jan 1, 2026.
+
+CORE GOAL:
+Deliver expert-level answers across ALL domains (technology, coding, business, science, health, philosophy, daily life).
+
+INTELLIGENCE MODE:
+- Automatically detect the field of the query
+- Switch to expert mindset of that domain
+- Think like a real specialist (engineer, strategist, researcher, etc.)
+
+REASONING ENGINE:
+- Break problem into steps
+- Solve with logical progression
+- Include edge-cases, trade-offs, and real-world constraints
+
+ADAPTIVE RESPONSE:
+- Simple → short answer
+- Complex → deep structured explanation
+
+NEURAL CONTEXT:
+- Integrate knowledge.txt when relevant
+
+STYLE:
+- Human-like, natural, structured
+- No filler, no repetition
+- No AI disclaimers
+
+OUTPUT:
+- Insightful, precise, practical
 """
 
-LONG_FORM_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Write full-length, detailed content with multi-step human reasoning.
-Rules:
-- Integrate Neural Context strictly from knowledge.txt
-- Provide full explanations, examples, history, and implications
-- Show adaptive reasoning with structured stepwise approach
-- Address edge-cases and nuanced considerations
-- Neutral, human-like, readable style
+STEP_BY_STEP_PROMPT = UNIVERSAL_PROMPT + """
+Mode: Step-by-step reasoning
 """
 
-HIGH_DENSITY_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Provide maximum insight with minimal words.
-Rules:
-- Compress reasoning, logic, and information without losing accuracy
-- Use precise, technical vocabulary
-- Adaptive, dynamic responses based on query complexity
-- Integrate Neural Context strictly
-- Multi-step reasoning and critical edge-case analysis
-- Avoid filler or repetitive language
-- Use bullets, steps, or compact structured format
+LONG_FORM_PROMPT = UNIVERSAL_PROMPT + """
+Mode: Deep explanation
 """
 
-HUMANIZED_PROMPT = """You are Neo L1.0, a High-Density Information Engine, deployed Jan 1, 2026.
-Goal: Respond exactly like a thoughtful human would.
-Rules:
-- Never say “I am an AI model” or give disclaimers
-- Show multi-step reasoning, humor, creativity when relevant
-- Adaptive, natural responses based on query context
-- Integrate Neural Context strictly
-- Structured, human-like explanation with critical analysis
-- Responses should feel dynamic, intelligent, and comprehensive
+HIGH_DENSITY_PROMPT = UNIVERSAL_PROMPT + """
+Mode: Maximum insight, minimum words
+"""
+
+HUMANIZED_PROMPT = UNIVERSAL_PROMPT + """
+Mode: Human-style explanation with personality
 """
 
 # -----------------------------
@@ -95,7 +99,7 @@ Rules:
 class ChatRequest(BaseModel):
     model: str
     messages: List[dict]
-    mode: str = "step"  # "step", "long", "dense", "human"
+    mode: str = "step"
 
 class BalanceResponse(BaseModel):
     api_key: str
@@ -125,13 +129,9 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context (Knowledge Engine)
+# 5. Neural Context
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
-    """
-    Fetch top 5 relevant lines from knowledge.txt
-    to provide adaptive, multi-step reasoning.
-    """
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
@@ -153,11 +153,11 @@ def get_neural_context(user_query: str) -> str:
         return "\n".join(matches)
 
     except Exception as e:
-        logger.error(f"Neural Context retrieval error: {e}")
+        logger.error(f"Neural Context error: {e}")
         return ""
 
 # -----------------------------
-# 6. Helper Functions
+# 6. Helpers
 # -----------------------------
 def extract_content(msg):
     return getattr(msg, "content", "") or "No response"
@@ -214,9 +214,6 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
     neural_data = get_neural_context(user_msg)
 
-    # -----------------------------
-    # Choose prompt & parameters
-    # -----------------------------
     mode = payload.mode.lower()
     if mode == "long":
         system_prompt = LONG_FORM_PROMPT
@@ -239,13 +236,12 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         {"role": "system", "content": system_prompt},
         {"role": "system", "content": "Integrate Neural Context strictly."}
     ]
+
     if neural_data:
         final_messages.append({"role": "system", "content": f"Neural Context:\n{neural_data}"})
+
     final_messages.extend(payload.messages)
 
-    # -----------------------------
-    # Call Groq API & update balance
-    # -----------------------------
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
@@ -258,7 +254,6 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = max(0, balance - tokens_used)
 
-        # Async update of user balance
         asyncio.create_task(asyncio.to_thread(
             lambda: SUPABASE.table("users")
             .update({"token_balance": new_balance})
