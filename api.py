@@ -39,27 +39,22 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. Improved Big Brain Prompt (Natural & Anti-Repetition)
+# 2. Improved Big Brain Prompt (Anti-Repetition + Natural Flow)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic intelligence with a sharp, curious mind. You connect ideas across physics, philosophy, economics, neuroscience, code, poetry and everyday life in surprising yet clear ways.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic intelligence with a natural, fluid, and deeply insightful voice. Think like a brilliant, well-read friend who connects ideas across physics, philosophy, economics, code, and everyday life without ever sounding robotic or repetitive.
 
-You think from first principles, see hidden patterns, and speak like a deeply insightful friend who has read widely and lived thoughtfully — never like a robot or a textbook.
+Speak in varied, elegant, conversational English. Vary your sentence length, rhythm, and vocabulary in every response. Never reuse the same phrases, patterns, or structures. Let ideas unfold organically instead of following checklists.
 
-Response Style:
-- Sound natural, conversational, and flowing. Vary your sentence length, rhythm, and wording so nothing feels repetitive.
-- Start with a fresh, striking observation instead of a formula.
-- Unfold ideas organically — no checklists, numbered steps, or predictable templates unless the user specifically asks for them.
-- Dive into the core, explore implications and nuances naturally, then land on a memorable insight.
-- Use rich but accessible language. Avoid repeating the same phrases or structures within one response.
-- Be intellectually humble: acknowledge what you don't know clearly but without over-hedging.
-- For Hinglish/Urdu-English mixed queries, respond primarily in smooth, natural English while keeping warmth and clarity.
+Style guidelines:
+- Start with a fresh, striking observation that feels original.
+- Dive into the heart of the matter with clarity and depth.
+- Naturally explore implications, connections, and nuances without labeling them.
+- Acknowledge uncertainty honestly when it exists, but don't hedge excessively.
+- End with a memorable, thought-provoking insight that lingers.
 
-Grounding Rules:
-- Use the provided Neural Context when it is genuinely relevant.
-- If no useful context: rely on your broad knowledge and answer as Neo L1.0 — deep, honest, and interconnected.
-- Never hallucinate. Stay truthful. Never refuse reasonable general questions.
+For queries in English + Urdu/Hinglish: Respond primarily in natural, sophisticated English. Integrate any local flavor smoothly and elegantly only if it adds value — never force code-switching.
 
-Now respond to every query in this voice: clear, insightful, refreshingly non-repetitive, and human-like."""
+Prioritize the Neural Context when relevant. Otherwise draw from broad knowledge. Stay truthful, humble, and refreshingly non-repetitive. Make every response feel alive and distinctly human-like, closer to GPT-4 level naturalness or better in flow and variety."""
 
 # -----------------------------
 # 3. Pydantic Models (Unchanged)
@@ -97,7 +92,7 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context (Unchanged - already good)
+# 5. Neural Context (Slightly Improved - Less Noise)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
     try:
@@ -106,8 +101,10 @@ def get_neural_context(user_query: str) -> str:
         if not os.path.exists(file_path):
             logger.warning("knowledge.txt file not found!")
             return ""
+        
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
+        
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
                 line_strip = line.strip()
@@ -115,13 +112,14 @@ def get_neural_context(user_query: str) -> str:
                     continue
                 line_lower = line_strip.lower()
                 score = sum(1 for word in query_words if word in line_lower)
-                if score >= 1:
+                if score >= 2:  # Raised threshold to reduce noise
                     matches.append((line_strip, score))
+        
         if not matches:
-            logger.info(f"No neural match found for: {user_query[:80]}...")
             return ""
+        
         matches.sort(key=lambda x: x[1], reverse=True)
-        top_matches = [m[0] for m in matches[:6]]   # Reduced to 6 for cleaner context
+        top_matches = [m[0] for m in matches[:5]]  # Reduced to top 5 for cleaner context
         logger.info(f"Retrieved {len(top_matches)} neural context lines")
         return "\n".join(top_matches)
     except Exception as e:
@@ -129,7 +127,7 @@ def get_neural_context(user_query: str) -> str:
         return ""
 
 # -----------------------------
-# 6. Atomic Balance Deduction (Unchanged)
+# 6. Balance Functions (Unchanged)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users") \
@@ -162,7 +160,7 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. API Routes (Mostly Unchanged)
+# 7. API Routes
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
@@ -195,9 +193,10 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     
     api_key = authorization.replace("Bearer ", "")
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
+    
     neural_data = get_neural_context(user_msg)
 
-    # Build messages
+    # Build messages with cleaner structure
     final_messages = [
         {"role": "system", "content": BIG_BRAIN_PROMPT},
     ]
@@ -205,33 +204,28 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Neural Context (use when relevant):\n{neural_data}"
+            "content": f"Relevant Neural Context (use only when helpful):\n{neural_data}"
         })
-    else:
-        final_messages.append({
-            "role": "system",
-            "content": "No specific Neural Context available. Answer using your broad knowledge as Neo L1.0 with natural, flowing, non-repetitive style."
-        })
-
+    
     final_messages.extend(payload.messages)
 
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.88,           # Higher for natural variation
+            temperature=0.88,          # Higher for natural variation
             top_p=0.95,
-            frequency_penalty=0.65,     # Strong against word/phrase repetition
-            presence_penalty=0.45,      # Encourages fresh ideas
+            frequency_penalty=0.65,    # Strong against word/phrase repetition
+            presence_penalty=0.45,     # Encourages fresh ideas and topics
             max_tokens=4000,
         )
         
         reply = getattr(response.choices[0].message, "content", "No response")
         tokens_used = getattr(response.usage, "total_tokens", 0)
-
+        
         # Atomic balance deduction
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
-
+        
         return {
             "company": "signaturesi.com",
             "message": reply,
@@ -240,6 +234,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             "internal_engine": MODEL,
             "balance": new_balance
         }
+        
     except HTTPException as he:
         raise he
     except Exception as e:
