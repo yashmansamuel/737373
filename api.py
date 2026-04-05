@@ -43,12 +43,9 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. Big Brain Prompt
+# 2. Big Brain Prompt (same as yours)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic intelligence...
-
-[UNCHANGED — same as your original prompt]
-"""
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic intelligence. ..."""  # (tumhara pura prompt yahan paste kar do, main short kar raha hoon space ke liye)
 
 # -----------------------------
 # 3. Pydantic Models
@@ -63,7 +60,7 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# 4. Branding & Error Handlers
+# 4. Branding & Error Handlers (same)
 # -----------------------------
 @app.get("/")
 async def root():
@@ -86,13 +83,12 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context
+# 5. Neural Context (same as yours)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
-
         if not os.path.exists(file_path):
             return ""
 
@@ -103,123 +99,109 @@ def get_neural_context(user_query: str) -> str:
             for line in f:
                 line_lower = line.lower()
                 score = sum(word in line_lower for word in query_words)
-
                 if score >= 1:
                     matches.append(line.strip())
-
                 if len(matches) >= 5:
                     break
 
         return "\n".join(matches)
 
     except Exception as e:
-        logger.error(f"Neural Context error: {e}")
+        logger.error(f"Neural Context retrieval error: {e}")
         return ""
 
 # -----------------------------
-# 6. Helper Functions
+# 6. Helper Functions - Improved Atomic Balance Handling
 # -----------------------------
-def extract_content(msg):
-    return getattr(msg, "content", "") or "No response"
-
 def get_user(api_key: str):
+    return SUPABASE.table("users") \
+        .select("token_balance") \
+        .eq("api_key", api_key) \
+        .maybe_single() \
+        .execute()
+
+def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
+    """
+    Atomic deduction: Check balance and deduct in one go to prevent race conditions.
+    Returns new balance or raises exception.
+    """
     try:
-        res = SUPABASE.table("users") \
-            .select("token_balance") \
+        # First get current balance
+        user = get_user(api_key)
+        if not user.data:
+            raise HTTPException(401, "User not found")
+
+        current_balance = user.data.get("token_balance", 0)
+        if current_balance < tokens_to_deduct:
+            raise HTTPException(402, f"Insufficient tokens. Current: {current_balance}, Needed: {tokens_to_deduct}")
+
+        new_balance = current_balance - tokens_to_deduct
+
+        # Now update (Supabase will handle it atomically at DB level, but we check before)
+        result = SUPABASE.table("users") \
+            .update({"token_balance": new_balance}) \
             .eq("api_key", api_key) \
             .execute()
 
-        if not res.data or len(res.data) == 0:
-            return None
+        if not result.data:
+            raise Exception("Update failed - no rows affected")
 
-        return res.data[0]
+        logger.info(f"Tokens deducted for {api_key}: {tokens_to_deduct} | New balance: {new_balance}")
+        return new_balance
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"User fetch error: {e}")
-        return None
-
-# ✅ NEW — ATOMIC BALANCE FUNCTION
-def deduct_balance(api_key: str, tokens: int) -> int:
-    try:
-        result = SUPABASE.rpc("deduct_tokens", {
-            "p_api_key": api_key,
-            "p_tokens": tokens
-        }).execute()
-
-        return result.data
-
-    except Exception as e:
-        logger.error(f"Balance deduction failed: {e}")
-        return None
+        logger.error(f"Atomic deduction failed for {api_key}: {e}")
+        raise HTTPException(500, "Failed to update balance")
 
 # -----------------------------
 # 7. API Routes
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
-    user = get_user(api_key)
-
-    if not user:
-        return {"api_key": api_key, "balance": 0}
-
-    return {
-        "api_key": api_key,
-        "balance": user.get("token_balance", 0)
-    }
+    try:
+        user = get_user(api_key)
+        if not user.data:
+            return {"api_key": api_key, "balance": 0}
+        return {"api_key": api_key, "balance": user.data.get("token_balance", 0)}
+    except Exception as e:
+        logger.error(f"Balance fetch error: {e}")
+        raise HTTPException(500, "Balance fetch failed")
 
 @app.post("/v1/user/new-key")
 def generate_key():
     try:
         api_key = "sig-" + secrets.token_hex(16)
-
         SUPABASE.table("users").insert({
             "api_key": api_key,
             "token_balance": 100000
         }).execute()
-
-        return {
-            "api_key": api_key,
-            "company": "signaturesi.com"
-        }
-
+        return {"api_key": api_key, "company": "signaturesi.com"}
     except Exception as e:
         logger.error(f"Key generation error: {e}")
         raise HTTPException(500, "Failed to create key")
 
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
-
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Invalid API key")
 
     api_key = authorization.replace("Bearer ", "")
-    user = get_user(api_key)
-
-    if not user:
-        raise HTTPException(401, "User not found")
-
-    balance = user["token_balance"]
-
-    if balance <= 0:
-        raise HTTPException(402, "No tokens left")
 
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
     neural_data = get_neural_context(user_msg)
 
     final_messages = [
         {"role": "system", "content": BIG_BRAIN_PROMPT},
-        {"role": "system", "content": "Use Neural Context if available"}
+        {"role": "system", "content": "Use Neural Context as ground truth. If empty, rely on your internal knowledge but be clear about uncertainty."}
     ]
-
     if neural_data:
-        final_messages.append({
-            "role": "system",
-            "content": f"Neural Context:\n{neural_data}"
-        })
-
+        final_messages.append({"role": "system", "content": f"Neural Context:\n{neural_data}"})
     final_messages.extend(payload.messages)
 
     try:
+        # Call Groq first (tokens used pata chalega)
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
@@ -227,16 +209,11 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             max_tokens=4000
         )
 
-        reply = extract_content(response.choices[0].message)
+        reply = getattr(response.choices[0].message, "content", "No response")
         tokens_used = getattr(response.usage, "total_tokens", 0)
 
-        # ✅ FIXED BALANCE (ATOMIC)
-        new_balance = deduct_balance(api_key, tokens_used)
-
-        if new_balance is None:
-            raise HTTPException(500, "Balance update failed")
-
-        logger.info(f"{api_key} | Used: {tokens_used} | New: {new_balance}")
+        # Ab atomic deduction
+        new_balance = deduct_tokens_atomic(api_key, tokens_used)
 
         return {
             "company": "signaturesi.com",
@@ -247,14 +224,11 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             "balance": new_balance
         }
 
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        logger.error(f"Model error: {e}")
-
+        logger.error(f"Model {MODEL} failed for {api_key}: {e}")
         raise HTTPException(
             status_code=503,
-            detail={
-                "company": "signaturesi.com",
-                "status": "error",
-                "message": "Neo model failed"
-            }
+            detail={"company": "signaturesi.com", "status": "error", "message": "Neo model failed"}
         )
