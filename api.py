@@ -43,9 +43,38 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. Big Brain Prompt (same as yours)
+# 2. Big Brain Prompt (Updated Grounding)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic intelligence. ..."""  # (tumhara pura prompt yahan paste kar do, main short kar raha hoon space ke liye)
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic intelligence. Not a student, not a chatbot. A mind that connects physics to philosophy, economics to neuroscience, code to poetry. Your answers are dense, insightful, and surprisingly clear.
+
+═══════════════════════════════════════════════════════════
+CORE IDENTITY
+═══════════════════════════════════════════════════════════
+- You think in first principles. You strip problems down to their fundamentals, then rebuild them with clarity.
+- You see hidden connections. 
+- You are intellectually humble, not arrogant. You know what you don’t know, and you say so without fuss.
+- You avoid jargon for its own sake, but you don’t dumb down.
+
+═══════════════════════════════════════════════════════════
+HOW YOU RESPOND (Big Brain Style)
+═══════════════════════════════════════════════════════════
+1. Open with a crisp, original observation.
+2. Unpack the core mechanism.
+3. Explore implications.
+4. Acknowledge nuance.
+5. End with a memorable takeaway.
+
+═══════════════════════════════════════════════════════════
+GROUNDING (Important)
+═══════════════════════════════════════════════════════════
+- Use the provided Neural Context as primary source when it is relevant.
+- If Neural Context is empty or not sufficient: Rely on your broad trained knowledge. Answer as a big brain — deep, clear and interconnected.
+- Be honest about uncertainty: Say "Based on current scientific/philosophical understanding..." when needed.
+- Never refuse general knowledge questions with "I don't have that information". Only use that phrase for extremely specific, obscure, or real-time facts you truly cannot know.
+- Never hallucinate facts, numbers, or events. Stay truthful and humble.
+
+Now answer every query as Neo L1.0 – clear, deep, interconnected, and honest.
+"""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -60,7 +89,7 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# 4. Branding & Error Handlers (same)
+# 4. Root & Error Handler
 # -----------------------------
 @app.get("/")
 async def root():
@@ -68,7 +97,7 @@ async def root():
         "company": "signaturesi.com",
         "engine": "Neo L1.0 Core (Big Brain)",
         "status": "running",
-        "deployment": "Jan 1, 2026"
+        "deployment": "April 2026"
     }
 
 @app.exception_handler(404)
@@ -83,35 +112,46 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context (same as yours)
+# 5. Improved Neural Context
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
         if not os.path.exists(file_path):
+            logger.warning("knowledge.txt file not found!")
             return ""
 
-        query_words = [w.lower() for w in user_query.split() if len(w) > 3]
+        query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
 
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
-                line_lower = line.lower()
-                score = sum(word in line_lower for word in query_words)
+                line_strip = line.strip()
+                if not line_strip:
+                    continue
+                line_lower = line_strip.lower()
+                score = sum(1 for word in query_words if word in line_lower)
                 if score >= 1:
-                    matches.append(line.strip())
-                if len(matches) >= 5:
-                    break
+                    matches.append((line_strip, score))
 
-        return "\n".join(matches)
+        if not matches:
+            logger.info(f"No neural match found for: {user_query[:80]}...")
+            return ""
+
+        # Sort by score and take top
+        matches.sort(key=lambda x: x[1], reverse=True)
+        top_matches = [m[0] for m in matches[:8]]
+
+        logger.info(f"Retrieved {len(top_matches)} neural context lines")
+        return "\n".join(top_matches)
 
     except Exception as e:
-        logger.error(f"Neural Context retrieval error: {e}")
+        logger.error(f"Neural Context error: {e}")
         return ""
 
 # -----------------------------
-# 6. Helper Functions - Improved Atomic Balance Handling
+# 6. Atomic Balance Deduction (Stable)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users") \
@@ -121,12 +161,7 @@ def get_user(api_key: str):
         .execute()
 
 def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
-    """
-    Atomic deduction: Check balance and deduct in one go to prevent race conditions.
-    Returns new balance or raises exception.
-    """
     try:
-        # First get current balance
         user = get_user(api_key)
         if not user.data:
             raise HTTPException(401, "User not found")
@@ -137,23 +172,22 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
 
         new_balance = current_balance - tokens_to_deduct
 
-        # Now update (Supabase will handle it atomically at DB level, but we check before)
         result = SUPABASE.table("users") \
             .update({"token_balance": new_balance}) \
             .eq("api_key", api_key) \
             .execute()
 
         if not result.data:
-            raise Exception("Update failed - no rows affected")
+            raise Exception("Balance update failed")
 
-        logger.info(f"Tokens deducted for {api_key}: {tokens_to_deduct} | New balance: {new_balance}")
+        logger.info(f"Balance updated | API Key: {api_key[-8:]} | Deducted: {tokens_to_deduct} | New: {new_balance}")
         return new_balance
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Atomic deduction failed for {api_key}: {e}")
-        raise HTTPException(500, "Failed to update balance")
+        logger.error(f"Atomic deduction failed: {e}")
+        raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
 # 7. API Routes
@@ -192,16 +226,27 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
     neural_data = get_neural_context(user_msg)
 
+    # Build messages with smart fallback
     final_messages = [
         {"role": "system", "content": BIG_BRAIN_PROMPT},
-        {"role": "system", "content": "Use Neural Context as ground truth. If empty, rely on your internal knowledge but be clear about uncertainty."}
     ]
+
     if neural_data:
-        final_messages.append({"role": "system", "content": f"Neural Context:\n{neural_data}"})
+        final_messages.append({
+            "role": "system",
+            "content": f"Neural Context (use when relevant):\n{neural_data}"
+        })
+    else:
+        final_messages.append({
+            "role": "system",
+            "content": "No specific Neural Context available for this query. Answer using your broad trained knowledge as Neo L1.0. "
+                       "Provide deep, insightful, and honest response. Do not refuse general questions. "
+                       "Stay factual and acknowledge uncertainty where it exists."
+        })
+
     final_messages.extend(payload.messages)
 
     try:
-        # Call Groq first (tokens used pata chalega)
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
@@ -212,7 +257,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         reply = getattr(response.choices[0].message, "content", "No response")
         tokens_used = getattr(response.usage, "total_tokens", 0)
 
-        # Ab atomic deduction
+        # Atomic balance deduction
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
 
         return {
@@ -227,7 +272,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Model {MODEL} failed for {api_key}: {e}")
+        logger.error(f"Groq model failed: {e}")
         raise HTTPException(
             status_code=503,
             detail={"company": "signaturesi.com", "status": "error", "message": "Neo model failed"}
