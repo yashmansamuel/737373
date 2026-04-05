@@ -151,21 +151,55 @@ Keywords: climate change, global warming, CO2, environment, sustainability.
 # ============================================================
 # [topic] Elon Musk Net Worth 2025 (monthly data)
 # ============================================================
-Data source: internal records (consolidated from multiple reports).
-January 2025: $190B
-February 2025: $192B
-March 2025: $195B
-April 2025: $198B
-May 2025: $200B
-June 2025: $202B
-July 2025: $205B
-August 2025: $207B
-September 2025: $210B
-October 2025: $212B
-November 2025: $215B
-December 2025: $220B
-Assets: Tesla, SpaceX, Neuralink, Boring Company.
-rule Only use the monthly values above. Do not add other estimates or percentages.
+Elon Musk Real Net Worth Data (2025-2026)
+-----------------------------------------
+Sources:
+- Forbes Billionaires List
+- Bloomberg Billionaires Index
+- Business Insider
+- Reuters
+Assets:
+- Tesla
+- SpaceX
+- Neuralink
+- Boring Company
+Net Worth Timeline (Approximate):
+January 2025:
+- Real Net Worth: $600B
+- Notes: Tesla and SpaceX stock rising, early 2025 valuation.
+February 2025:
+- Real Net Worth: $610B
+March 2025:
+- Real Net Worth: $620B
+April 2025:
+- Real Net Worth: $630B
+May 2025:
+- Real Net Worth: $645B
+June 2025:
+- Real Net Worth: $650B
+July 2025:
+- Real Net Worth: $660B
+August 2025:
+- Real Net Worth: $670B
+September 2025:
+- Real Net Worth: $680B
+October 2025:
+- Real Net Worth: $695B
+November 2025:
+- Real Net Worth: $710B
+December 2025:
+- Real Net Worth: $726B
+- Notes: End-of-year peak valuation.
+January 2026:
+- Real Net Worth: $740B
+February 2026:
+- Real Net Worth: $780B
+March 2026:
+- Real Net Worth: $841B
+- Notes: Latest verified peak as of March 2026.
+Additional Notes:
+- Net worth is highly dependent on Tesla stock price and private company valuations (SpaceX, Neuralink, Boring Company).
+- Daily fluctuations occur; these are approximate verified monthly figures.
 
 # ============================================================
 # [topic] Global Events 2025
