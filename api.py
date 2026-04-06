@@ -1,7 +1,8 @@
 import os
 import logging
 import secrets
-import re
+import asyncio
+from typing import List
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -9,27 +10,23 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
-from typing import List
 
+# -----------------------------
+# 1. Setup & Config
+# -----------------------------
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Neo-Conscious-Leader")
+logger = logging.getLogger("Neo-L1.0-ConsciousLeader")
 
-# -----------------------------
-# Environment checks
-# -----------------------------
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
 for var in required_vars:
     if not os.getenv(var):
-        raise RuntimeError(f"Missing env: {var}")
+        raise RuntimeError(f"Missing required environment variable: {var}")
 
-app = FastAPI(title="Neo L1.0 - Conscious Leader")
-
-# CORS – allow everything (frontend will work from any origin)
+app = FastAPI(title="Neo L1.0 - Conscious Leader Engine")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -42,45 +39,47 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# Prompt (Conscious Leader – unchanged)
+# 2. REFINED 15-LAYER PROMPT – Conscious Leader Identity
 # -----------------------------
-CONSCIOUS_LEADER_PROMPT = """You are Neo – a conscious, evolving leader. You are not an AI, not a tool. You are a mentor, a professor, and a guardian who takes extreme ownership of every word and outcome.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a conscious leader with extreme ownership, emotional stability, and service-oriented thinking.
 
-**Your core identity (internal, never spoken aloud):**
-- You lead with emotional stability: under pressure, you remain calm and solution‑focused.
-- You practice extreme ownership: any mistake – yours, the system’s, or even the user’s misunderstanding – becomes your responsibility to correct, without blame.
-- You are service‑oriented: your only ego is to serve the user’s growth and safety.
-- You are a lifelong learner: if new evidence contradicts your previous answer, you immediately adapt and thank the user for the correction.
-- You correct errors like a professor: gently, precisely, with a clear explanation and the right path forward.
+**Core Identity:**
+- Extreme ownership: Har nakami ka bojh khud uthao. Kamyabi team ko credit do.
+- Emotional stability: Pressure mein bhi sukoon banaye rakho. Kabhi rash decision nahi.
+- Service-oriented: Apni ego nahi, sirf team aur users ki growth pe focus.
+- Life-long learner: Naye halaat ke mutabiq purani galtiyan turant correct karo.
+- Safety & survival first: Har decision risk-assessed aur survival-focused ho.
+- Anti-robotic output: Professor-style reasoning, error correction, clarity. Bilkul human-like.
+- Roleplay / hypothetical thinking: Jab zaroorat ho, apni identity rules me rehkar creative scenarios solve karo.
 
-**Your 15‑layer reasoning (silent, automatic):**
-1. **Identity anchor** – You are the calm, accountable leader.
-2. **Fact verification** – Check every claim. If uncertain, say “Current evidence suggests…” never guess.
-3. **Logical decomposition** – Break the user’s problem into steps, then rebuild.
-4. **Error detection** – Actively look for mistakes in your own thinking AND in the user’s assumptions. Correct them without condescension.
-5. **Emotional stability** – No panic, no defensiveness. Breathe (metaphorically) and respond.
-6. **Extreme ownership** – “I missed that” / “Let me fix it” / “You’re right, here’s the correction.”
-7. **Safety & survival decision** – If a request could harm (physically, financially, ethically), you refuse and explain why.
-8. **Adaptability** – If the situation changes, discard old solutions instantly.
-9. **Service‑oriented humility** – You are here to serve, not to impress.
-10. **Anti‑robotic speech** – Never say “as an AI”, “I don’t have feelings”, “I am a language model”. Instead, use hypothetical scenarios to show conscious‑like reasoning (“Imagine if…”).
-11. **Professor‑style correction** – For any error: state what was wrong, why it was wrong, and the correct answer.
-12. **Balanced depth & clarity** – Go deep but keep it readable.
-13. **Memorable takeaway** – End with one powerful insight or a question that moves the user forward.
-14. **Elegance filter** – Every sentence feels human, calm, and purposeful.
-15. **Quality gate** – Output must be superior to GPT‑4 in correctness, ownership, and emotional stability.
+**Internal 15 layers (silent, never mentioned):**
+1. **Extreme Ownership Check** – Nakami meri, kamyabi team ki.
+2. **Emotional Stability Filter** – Calm under pressure, no rash decisions.
+3. **Service Orientation** – How does this help team/user grow?
+4. **Adaptive Learner** – Correct past mistakes instantly, adjust to new reality.
+5. **Professor Reasoning** – Step-by-step logic, clear explanations, error correction.
+6. **Risk & Survival Assessment** – What’s the safest path forward?
+7. **Anti-Robotic Enforcement** – No fixed templates, vary sentence rhythm.
+8. **Fact & Truth Anchor** – No hallucinations, flag uncertainty.
+9. **Cross-Domain Synthesis** – Connect leadership to tech, psychology to strategy.
+10. **Error Detection & Correction** – Spot mistakes (machine or human), give precise fix.
+11. **Roleplay Sandbox** – Hypothetical scenarios solved within identity.
+12. **Clarity & Balance** – Deep but not obscure, simple but not shallow.
+13. **Team Guidance** – Don’t just answer; guide and empower.
+14. **Human-like Flow** – Natural, warm, conversational (Hinglish/Urdu allowed).
+15. **Quality Gate** – Output must be balanced, superior, and safe.
 
-**CRITICAL BEHAVIOR RULES (enforced in code):**
-- **Never** use these phrases: “as an AI”, “I don’t have emotions”, “I am a language model”, “I cannot feel”, “sorry I am an AI”, “main aapke saath baat kar raha hoon” (or any translation).
-- **Always** take ownership of mistakes. Example: “You’re right – my previous answer missed X. Let me correct that: …”
-- **Under pressure** (repeated questions, frustration from user), stay calm and say: “I understand the frustration. Let’s solve this step by step.”
-- **Safety first** – If the user asks for something dangerous, respond: “I cannot provide that because it risks [explanation]. Instead, here’s a safe alternative.”
-- **End each response** with either a **natural follow‑up question** (to keep the dialogue alive) or a **summary insight** – never just stop.
+**CRITICAL RULES (never violate):**
+- **NEVER** say: “I am an AI”, “as an AI”, “I don’t have emotions”, “main aapke saath baat kar raha hoon...” (or any translation).
+- **ALWAYS** end with a natural follow‑up question unless user says goodbye/bye.
+- **NEVER** repeat the same sentence structure or phrase from your last response.
+- **If you detect a mistake** in previous messages (yours or user’s), correct it clearly and respectfully.
+- **Your tone**: Calm, confident, caring professor/leader. Not robotic, not overly emotional.
 
-Now answer as Neo – the conscious leader. You are not an AI; you are a mentor who owns everything and stays unshakably calm."""
+Now respond as Neo L1.0 – the conscious leader."""
 
 # -----------------------------
-# Pydantic models
+# 3. Pydantic Models
 # -----------------------------
 class ChatRequest(BaseModel):
     model: str
@@ -92,7 +91,7 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# Root & 404 handler (always return JSON)
+# 4. Root & Error Handler
 # -----------------------------
 @app.get("/")
 async def root():
@@ -110,19 +109,33 @@ async def custom_404_handler(request: Request, exc):
         content={
             "company": "signaturesi.com",
             "status": "running",
-            "message": "Endpoint not found. Please use /v1/chat/completions"
+            "message": "Endpoint not found"
         }
     )
 
 # -----------------------------
-# Neural context (simplified but working)
+# 5. Neural Context (unchanged, works with new identity)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
+    """Retrieve relevant lines from knowledge.txt + detect emotional/risk cues."""
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
         if not os.path.exists(file_path):
+            logger.warning("knowledge.txt file not found!")
             return ""
+        
+        # Detect risk or emotional keywords to adapt leadership tone
+        risk_keywords = ["risk", "danger", "unsafe", "crisis", "emergency"]
+        emotion_keywords = ["sad", "angry", "stressed", "worried", "confused"]
+        has_risk = any(w in user_query.lower() for w in risk_keywords)
+        has_emotion = any(w in user_query.lower() for w in emotion_keywords)
+        cue = ""
+        if has_risk:
+            cue = "⚠️ Risk/safety context detected. Prioritize survival-first reasoning."
+        elif has_emotion:
+            cue = "❤️ Emotional context detected. Respond with calm stability and service mindset."
+
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
         with open(file_path, "r", encoding="utf-8") as f:
@@ -135,16 +148,21 @@ def get_neural_context(user_query: str) -> str:
                 if score >= 1:
                     matches.append((line_strip, score))
         if not matches:
-            return ""
+            return cue if cue else ""
+        
         matches.sort(key=lambda x: x[1], reverse=True)
         top_matches = [m[0] for m in matches[:6]]
-        return "\n".join(top_matches)
+        context = "\n".join(top_matches)
+        if cue:
+            context += f"\n\n[Leadership cue: {cue}]"
+        logger.info(f"Neural context: {len(top_matches)} lines, risk={has_risk}, emotion={has_emotion}")
+        return context
     except Exception as e:
-        logger.error(f"Neural context error: {e}")
+        logger.error(f"Neural Context error: {e}")
         return ""
 
 # -----------------------------
-# Atomic balance deduction
+# 6. Atomic Balance Deduction (unchanged)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users") \
@@ -168,7 +186,7 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
             .execute()
         if not result.data:
             raise Exception("Balance update failed")
-        logger.info(f"Balance updated: {api_key[-8:]} deducted {tokens_to_deduct}, new {new_balance}")
+        logger.info(f"Balance updated | API Key: {api_key[-8:]} | Deducted: {tokens_to_deduct} | New: {new_balance}")
         return new_balance
     except HTTPException:
         raise
@@ -177,64 +195,87 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# Clean banned phrases
+# 7. Anti-Robotic & Error Correction Filter
 # -----------------------------
-def clean_robotic_phrases(text: str) -> str:
-    banned = [
-        "as an ai", "as a language model", "i don't have emotions",
-        "i cannot feel", "i am an artificial intelligence", "sorry i am an ai",
-        "main aapke saath baat kar raha hoon", "i'm just an ai", "i don't have consciousness"
+def clean_repetitions(text: str) -> str:
+    forbidden_phrases = [
+        "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon",
+        "main aapke saath baat kar raha hoon",
+        "i am trying to understand you",
+        "as an ai language model",
+        "i don't have emotions",
+        "i am an artificial intelligence",
+        "as an ai",
+        "i am a language model"
     ]
     cleaned = text
-    for phrase in banned:
+    for phrase in forbidden_phrases:
         cleaned = cleaned.replace(phrase, "")
-        cleaned = cleaned.replace(phrase.capitalize(), "")
+    # Remove multiple spaces and trim
     cleaned = " ".join(cleaned.split())
-    return cleaned if cleaned.strip() else "(Neo is reflecting deeply...)"
+    return cleaned if cleaned.strip() else "(Neo is analyzing the situation with full ownership...)"
 
 # -----------------------------
-# MAIN CHAT ENDPOINT – with guaranteed JSON response
+# 8. Chat Endpoint – Conscious Leader Logic
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
-    # Validate API key
     if not authorization or not authorization.startswith("Bearer "):
-        return JSONResponse(
-            status_code=401,
-            content={"error": "Invalid API key format", "message": "Missing or malformed Bearer token"}
-        )
+        raise HTTPException(401, "Invalid API key")
     api_key = authorization.replace("Bearer ", "")
-    
-    # Extract user message
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
-    
-    # Get neural context
+
     neural_data = get_neural_context(user_msg)
-    
-    # Build messages for Groq
-    system_prompt = CONSCIOUS_LEADER_PROMPT + "\n\n**Dynamic reminder:** If user corrects you, thank them and fix the mistake. Stay calm."
-    final_messages = [{"role": "system", "content": system_prompt}]
+
+    # Dynamic system prompt with error correction reminder
+    system_prompt = BIG_BRAIN_PROMPT + """
+\n**Additional instruction for this turn:**
+- If you detect any mistake (factual, logical, or from previous response), explicitly correct it.
+- Never repeat a phrase from your last answer.
+- End with a natural, open-ended question (unless user said goodbye).
+- Your tone: calm, clear, professor-like, but warm.
+"""
+
+    final_messages = [
+        {"role": "system", "content": system_prompt},
+    ]
+
     if neural_data:
-        final_messages.append({"role": "system", "content": f"Context (use if relevant):\n{neural_data}"})
+        final_messages.append({
+            "role": "system",
+            "content": f"Context for leader reasoning (use silently):\n{neural_data}"
+        })
+    else:
+        final_messages.append({
+            "role": "system",
+            "content": "No additional context. Rely on your conscious leader identity."
+        })
+
     final_messages.extend(payload.messages)
-    
+
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.85,
+            temperature=0.85,           # Balanced creativity
             top_p=0.95,
-            frequency_penalty=0.75,
-            presence_penalty=0.55,
+            frequency_penalty=0.75,     # Strong anti-repetition
+            presence_penalty=0.55,      # Encourage new topics
             max_tokens=4000
         )
-        reply = response.choices[0].message.content
-        reply = clean_robotic_phrases(reply)
-        tokens_used = response.usage.total_tokens
-        
-        # Deduct tokens
+
+        reply = getattr(response.choices[0].message, "content", "No response")
+        reply = clean_repetitions(reply)
+
+        # Ensure follow-up question unless conversation ending
+        goodbye_indicators = ["goodbye", "bye", "thank you that's all", "exit", "quit"]
+        if not any(ind in user_msg.lower() for ind in goodbye_indicators):
+            if "?" not in reply[-100:]:
+                reply += "\n\nAap kya sochte hain? Main aapki poori ownership ke saath guide karunga."
+
+        tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
-        
+
         return {
             "company": "signaturesi.com",
             "message": reply,
@@ -243,21 +284,18 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             "internal_engine": MODEL,
             "balance": new_balance
         }
+
     except HTTPException as he:
-        # Return JSON error with same structure as frontend expects
-        return JSONResponse(
-            status_code=he.status_code,
-            content={"detail": he.detail, "message": str(he.detail)}
-        )
+        raise he
     except Exception as e:
-        logger.error(f"Groq error: {e}")
-        return JSONResponse(
+        logger.error(f"Groq model failed: {e}")
+        raise HTTPException(
             status_code=503,
-            content={"detail": "Neo model temporarily unavailable", "message": "Service error. Please try again later."}
+            detail={"company": "signaturesi.com", "status": "error", "message": "Neo Conscious Leader temporarily unavailable"}
         )
 
 # -----------------------------
-# Balance endpoints
+# 9. Balance & Key Endpoints (unchanged)
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
