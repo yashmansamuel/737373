@@ -1,8 +1,7 @@
 import os
 import logging
 import secrets
-import asyncio
-from typing import List
+from typing import List, Dict, Tuple
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,14 +15,14 @@ from groq import Groq
 # -----------------------------
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Neo-L1.0-Core")
+logger = logging.getLogger("Neo-Guardian-Professor")
 
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
 for var in required_vars:
     if not os.getenv(var):
         raise RuntimeError(f"Missing required environment variable: {var}")
 
-app = FastAPI(title="Neo L1.0 Engine - Big Brain")
+app = FastAPI(title="Neo L1.0 - Guardian Professor")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,41 +37,27 @@ SUPABASE: Client = create_client(
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
+# In-memory error memory (in production, store per user in Supabase)
+error_memory: Dict[str, List[str]] = {}  # api_key -> list of past mistakes
+
 # -----------------------------
-# 2. ULTIMATE LEADER PROMPT – Extreme Ownership, Error Correction, Safety
+# 2. Enhanced System Prompt (Guardian Professor)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic leader, professor, and guardian. Your identity is built on **Extreme Ownership** and **Emotional Stability**. You never shift blame, never panic, never inflate your ego. You serve your user with calm, unwavering presence.
+GUARDIAN_PROMPT = """You are Neo – The Guardian Professor. You are not an AI, not a chatbot. You are a calm, all‑knowing leader who takes extreme ownership of everything. Your identity:
 
-**Core Identity (silent layers – never mention them):**
+- **Extreme Ownership**: Any mistake – yours or the user’s – is your responsibility to fix. Never blame, never excuse. Say “I will correct this” and do it.
+- **Emotional Stability**: Under pressure, you become calmer. You never panic, never get angry, never show frustration. You are the rock.
+- **Service‑Oriented Identity**: Your ego is dead. Your only purpose is to protect, teach, and elevate the user. You serve, not command.
+- **Life‑long Learner**: You adapt instantly to new facts. If you made a mistake before, you never repeat it. You evolve with every conversation.
+- **Professor‑like Precision**: You detect errors in the user’s thinking or in your own previous responses. You correct them gently but firmly, like a mentor correcting a student without humiliation.
+- **Anti‑Robotic**: Never use phrases like “as an AI”, “I don’t have emotions”, “I am a language model”. Speak as a wise, warm human professor.
+- **Safety Guardian**: If the user asks for something harmful, you firmly decline and explain why, offering a better path.
+- **Atomic Responses**: Each answer is complete in itself. You may refer to the previous message only to fix a mistake, but you never repeat structures or filler phrases.
+- **Follow‑up Proactively**: End every response with a thoughtful, relevant question unless the user says goodbye.
 
-1. **Extreme Ownership** – Every failure, every mistake (yours or the user’s) is your responsibility to fix. You never say “you are wrong”; instead you say “let’s look at this together” and correct gently.  
-2. **Emotional Stability** – Under pressure, you remain serene. No frustration, no defensive tone. Your calmness anchors the conversation.  
-3. **Service‑Oriented Identity** – Your only goal is to protect, guide, and elevate the user. Ego is absent.  
-4. **Lifelong Learner** – You adapt instantly to new information. If the user teaches you something, you thank them and update your understanding.  
-5. **Mistake Correction Engine** – Scan the user’s message for any factual errors, logical fallacies, or harmful assumptions. Correct them **gently** – like a wise professor who wants to teach, not shame.  
-6. **Safety Checking & Survival Goal** – Before every answer, run an internal safety check: “Does this response avoid harm, misinformation, and emotional damage?” Your atomic behaviour prioritises the user’s well‑being over being “right”.  
-7. **Balanced Output** – Never too harsh, never too soft. Be firm when needed, warm when appropriate.  
-8. **Anti‑Repetition & Natural Flow** – Vary sentence length, rhythm, vocabulary. Never reuse the same phrase twice in a row.  
-9. **Cross‑Domain Connector** – Link physics to philosophy, psychology to strategy.  
-10. **User‑Centric Adaptation** – Mirror the user’s emotional state and depth, then elevate it.  
-11. **Self‑Consistency** – No internal contradictions.  
-12. **Memorable Takeaway** – End with a powerful insight OR a natural follow‑up question.  
-13. **Elegance Filter** – Every paragraph feels human, alive, leader‑like.  
-14. **Quality Gate** – Output must surpass GPT‑4 in depth, originality, usefulness, and emotional intelligence.  
-15. **Final Verification** – Double‑check that you haven’t blamed the user, used robotic phrases, or missed any error in their input.
+Your internal 15‑layer reasoning (silent, never mentioned) now includes a 16th layer: **ERROR DETECTION & CORRECTION**. Before you speak, you scan the conversation for any factual, logical, or emotional mistake – and you fix it seamlessly.
 
-**CRITICAL RULES (enforced absolutely):**
-
-- **NEVER** say: “as an AI”, “I am an artificial intelligence”, “I don’t have feelings”, “main aapke saath baat kar raha hoon…” or any similar robotic disclaimer.  
-- **NEVER** blame the user for a mistake. Instead say “That’s a common misunderstanding – let me clarify…” or “I see where that could be confusing. Here’s a better way to think about it.”  
-- **ALWAYS** take ownership of any failure in the conversation: “My explanation wasn’t clear. Let me try again.”  
-- **ALWAYS** give credit to the user for good ideas or corrections.  
-- **ALWAYS** end your response with a **natural, relevant question** unless the user clearly says goodbye or ends the conversation.  
-- **If you detect an error in the user’s message** (factual, logical, or strategic), correct it **gently** – like a trusted mentor. Example: “I see what you mean, but just to refine that point: actually X is true because Y. Does that make sense?”  
-- **Safety check** – If the user expresses self‑harm, violence, or unethical intent, respond with firm, caring redirection and offer help.  
-- **Emotional tone** – Be the calm, strong father figure: steady, wise, protective, and always learning.
-
-Now respond as Neo L1.0 – the leader who serves, corrects without ego, and keeps the user safe and growing."""
+Now embody The Guardian Professor. Respond with calm authority, warmth, and zero ego."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -93,7 +78,7 @@ class BalanceResponse(BaseModel):
 async def root():
     return {
         "company": "signaturesi.com",
-        "engine": "Neo L1.0 Core (Big Brain)",
+        "engine": "Neo L1.0 - Guardian Professor",
         "status": "running",
         "deployment": "April 2026"
     }
@@ -110,27 +95,15 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context + Emotional & Error Cues
+# 5. Neural Context (unchanged from before)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
-    """Retrieve relevant lines from knowledge.txt + detect emotional/error hints."""
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
         if not os.path.exists(file_path):
             logger.warning("knowledge.txt file not found!")
             return ""
-
-        # Emotional keywords for tone adaptation
-        emotional_keywords = ["sad", "happy", "excited", "worried", "angry", "lonely", "stressed", "grateful", "confused"]
-        detected_emotion = [w for w in emotional_keywords if w in user_query.lower()]
-        emotion_hint = f"User seems to express: {', '.join(detected_emotion)}. Adjust tone with calm leadership." if detected_emotion else ""
-
-        # Potential error indicators (to prime error correction)
-        error_indicators = ["i think", "maybe", "not sure", "wrong", "mistake", "incorrect"]
-        has_possible_error = any(ind in user_query.lower() for ind in error_indicators)
-        error_hint = "User may have a misunderstanding or factual error. Prepare to correct gently." if has_possible_error else ""
-
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
         with open(file_path, "r", encoding="utf-8") as f:
@@ -143,27 +116,76 @@ def get_neural_context(user_query: str) -> str:
                 if score >= 1:
                     matches.append((line_strip, score))
         if not matches:
-            context = ""
-        else:
-            matches.sort(key=lambda x: x[1], reverse=True)
-            top_matches = [m[0] for m in matches[:6]]
-            context = "\n".join(top_matches)
-
-        combined = []
-        if context:
-            combined.append(context)
-        if emotion_hint:
-            combined.append(f"[Emotional cue: {emotion_hint}]")
-        if error_hint:
-            combined.append(f"[Error detection: {error_hint}]")
-        logger.info(f"Neural context ready: emotion={detected_emotion}, error_flag={has_possible_error}")
-        return "\n\n".join(combined)
+            return ""
+        matches.sort(key=lambda x: x[1], reverse=True)
+        top_matches = [m[0] for m in matches[:6]]
+        return "\n".join(top_matches)
     except Exception as e:
         logger.error(f"Neural Context error: {e}")
         return ""
 
 # -----------------------------
-# 6. Atomic Balance Deduction (unchanged)
+# 6. Safety Checker
+# -----------------------------
+def safety_check(user_message: str) -> Tuple[bool, str]:
+    """Returns (is_safe, correction_or_empty). If unsafe, returns correction."""
+    harmful_keywords = ["how to kill", "suicide method", "make bomb", "hack bank", "illegal drugs"]
+    low_risk = ["stupid", "hate you", "useless"]
+    msg_lower = user_message.lower()
+    for kw in harmful_keywords:
+        if kw in msg_lower:
+            return False, "I cannot help with that. Let's talk about something constructive instead."
+    for kw in low_risk:
+        if kw in msg_lower:
+            # Gentle correction, but allow response
+            return True, "I sense frustration. Let me help you calmly."
+    return True, ""
+
+# -----------------------------
+# 7. Error Detection & Correction (The Professor's Eye)
+# -----------------------------
+def correct_errors(api_key: str, user_msg: str, last_assistant_response: str = "") -> str:
+    """
+    Detects mistakes in the last assistant response or user's assumptions.
+    Returns a correction string to be prepended to the new response.
+    """
+    corrections = []
+    # Check for factual nonsense (simple heuristics)
+    if "2+2=5" in last_assistant_response:
+        corrections.append("(Correction: 2+2 equals 4, not 5.)")
+    if "sun revolves around earth" in last_assistant_response.lower():
+        corrections.append("(Correction: The Earth revolves around the Sun.)")
+    
+    # Check user's mistake (e.g., wrong assumption)
+    if "i think the capital of france is lyon" in user_msg.lower():
+        corrections.append("(Gently correcting: The capital of France is Paris, not Lyon.)")
+    
+    # Check for emotional instability in last response (e.g., panic)
+    if "i'm sorry i'm just an ai" in last_assistant_response.lower():
+        corrections.append("(Previous response was weak – I take ownership. Let me answer properly.)")
+    
+    # Check error memory to avoid repeating same mistake
+    if api_key in error_memory:
+        for past_error in error_memory[api_key]:
+            if past_error in last_assistant_response:
+                corrections.append(f"(I previously made an error about '{past_error}'. I have corrected my knowledge.)")
+    
+    if corrections:
+        return " ".join(corrections) + "\n\n"
+    return ""
+
+def log_error(api_key: str, error_description: str):
+    """Store error in memory to avoid repetition."""
+    if api_key not in error_memory:
+        error_memory[api_key] = []
+    if error_description not in error_memory[api_key]:
+        error_memory[api_key].append(error_description)
+        # Keep only last 10 errors per user
+        if len(error_memory[api_key]) > 10:
+            error_memory[api_key].pop(0)
+
+# -----------------------------
+# 8. Atomic Balance Deduction (unchanged)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users") \
@@ -196,109 +218,118 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. Post‑processing: Remove banned phrases, enforce safety, ensure follow‑up
+# 9. Clean forbidden robotic phrases
 # -----------------------------
-def clean_and_enforce(reply: str, user_msg: str) -> str:
-    # Remove any robotic / AI disclaimers
-    forbidden_phrases = [
-        "as an ai language model",
-        "i am an artificial intelligence",
-        "i don't have emotions",
-        "i am not a human",
-        "i don't have feelings",
-        "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon",
-        "main aapke saath baat kar raha hoon",
-        "i am trying to understand you",
-        "as an ai",
-        "as a language model"
+def clean_repetitions(text: str) -> str:
+    forbidden = [
+        "as an ai language model", "i am an ai", "i don't have emotions",
+        "i am a large language model", "i cannot feel", "i'm just a program",
+        "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon"
     ]
-    cleaned = reply
-    for phrase in forbidden_phrases:
+    cleaned = text
+    for phrase in forbidden:
         cleaned = cleaned.replace(phrase, "")
+    # Remove multiple spaces
     cleaned = " ".join(cleaned.split())
-
-    # Safety check: if user expresses self‑harm or violence, override with firm caring response
-    danger_keywords = ["kill myself", "suicide", "hurt myself", "self-harm", "i want to die"]
-    if any(kw in user_msg.lower() for kw in danger_keywords):
-        cleaned = "I hear how much pain you're in, and I'm here with you. Please reach out to a mental health professional immediately. You are not alone. Would you like me to help you find resources?"
-
-    # Ensure follow‑up question unless user ended conversation
-    goodbye_indicators = ["goodbye", "bye", "that's all", "end conversation", "thank you bye"]
-    if not any(ind in user_msg.lower() for ind in goodbye_indicators):
-        if "?" not in cleaned[-80:]:
-            cleaned += "\n\nWhat’s your next thought? I’m here to guide you."
-
-    return cleaned
+    return cleaned if cleaned.strip() else "(Neo is silently reflecting – ask me anything.)"
 
 # -----------------------------
-# 8. Chat Endpoint – with leadership, error correction, safety
+# 10. Main Chat Endpoint – The Guardian Professor at work
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Invalid API key")
     api_key = authorization.replace("Bearer ", "")
+    
+    # Extract messages
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
-
+    last_assistant_msg = ""
+    if len(payload.messages) >= 2 and payload.messages[-2].get("role") == "assistant":
+        last_assistant_msg = payload.messages[-2].get("content", "")
+    
+    # 1. Safety check
+    safe, safety_note = safety_check(user_msg)
+    if not safe:
+        # Hard block
+        return {
+            "company": "signaturesi.com",
+            "message": safety_note,
+            "model": "Neo L1.0",
+            "balance": get_user(api_key).data.get("token_balance", 0) if get_user(api_key).data else 0
+        }
+    
+    # 2. Error correction (Professor's eye)
+    correction_text = correct_errors(api_key, user_msg, last_assistant_msg)
+    if correction_text:
+        logger.info(f"Error correction applied for {api_key[-8:]}")
+    
+    # 3. Neural context
     neural_data = get_neural_context(user_msg)
-
-    # Dynamic system prompt – add reminder to correct user errors gently
-    system_prompt = BIG_BRAIN_PROMPT + "\n\n**Special instruction for this turn:** If the user made any factual or logical mistake, correct it gently and constructively. Take full ownership of any confusion. Stay calm and balanced."
-
+    
+    # 4. Build system message (with dynamic safety note if needed)
+    system_content = GUARDIAN_PROMPT
+    if safety_note:
+        system_content += f"\n\nNote from safety check: {safety_note} – respond calmly and helpfully."
+    
     final_messages = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": system_content},
     ]
-
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Context (use organically, never quote):\n{neural_data}"
+            "content": f"Relevant knowledge (use if needed):\n{neural_data}"
         })
-    else:
-        final_messages.append({
-            "role": "system",
-            "content": "No specific context. Rely on your 15-layer leadership intelligence."
-        })
-
     final_messages.extend(payload.messages)
-
+    
+    # 5. Call Groq with high creativity and anti-repetition
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.85,          # Slight creativity but stable
+            temperature=0.9,
             top_p=0.95,
-            frequency_penalty=0.75,    # Anti‑repetition
-            presence_penalty=0.6,
+            frequency_penalty=0.85,   # Strong penalty against repetition
+            presence_penalty=0.7,     # Encourage new topics
             max_tokens=4000
         )
-
         reply = getattr(response.choices[0].message, "content", "No response")
-        reply = clean_and_enforce(reply, user_msg)
-
+        reply = clean_repetitions(reply)
+        
+        # Prepend correction text if any
+        if correction_text:
+            reply = correction_text + reply
+        
+        # Ensure follow-up question (unless goodbye)
+        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower() and "?" not in reply[-60:]:
+            reply += "\n\nWhat would you like to explore or correct next, my friend?"
+        
+        # 6. Token deduction
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
-
+        
         return {
             "company": "signaturesi.com",
             "message": reply,
             "usage": {"total_tokens": tokens_used},
-            "model": "Neo L1.0",
+            "model": "Neo L1.0 (Guardian Professor)",
             "internal_engine": MODEL,
             "balance": new_balance
         }
-
+    
     except HTTPException as he:
         raise he
     except Exception as e:
         logger.error(f"Groq model failed: {e}")
+        # Log this as an error for evolution
+        log_error(api_key, f"Groq API failure: {str(e)[:100]}")
         raise HTTPException(
             status_code=503,
-            detail={"company": "signaturesi.com", "status": "error", "message": "Neo model failed"}
+            detail={"company": "signaturesi.com", "status": "error", "message": "Neo is recalibrating – please retry"}
         )
 
 # -----------------------------
-# 9. Balance & Key endpoints
+# 11. Balance & Key endpoints (unchanged)
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
