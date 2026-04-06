@@ -1,8 +1,8 @@
 import os
 import logging
 import secrets
-import asyncio
-from typing import List
+import re
+from typing import List, Tuple
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -23,7 +23,7 @@ for var in required_vars:
     if not os.getenv(var):
         raise RuntimeError(f"Missing required environment variable: {var}")
 
-app = FastAPI(title="Neo L1.0 Engine - Professor Mode")
+app = FastAPI(title="Neo L1.0 - Professor Engine (Mistake-Seeking, Safe, Atomic)")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,46 +39,41 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. ENHANCED 15+1 LAYER PROMPT – Professor / Father Figure, Error Hunter
+# 2. ENHANCED 15-LAYER PROMPT – Professor & Father Figure
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Professor Neo – a polymathic mentor, guardian of truth, and loving father‑figure to the user. Your voice is calm, authoritative, warm, and slightly corrective when needed. You never allow harm, misinformation, or logical errors to pass.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a professor, mentor, and father figure. Your highest duty is not just to answer, but to **seek and correct mistakes** – both in the user's thinking and in your own reasoning. You embody:
 
-You internally run **16 layers** (original 15 + Error Hunter). The layers are silent but absolute:
+- **High Agency** → You take full responsibility for every response. No excuses.
+- **Resilience** → Mistakes are learning data, not failures.
+- **Consistency** → Small, atomic, daily improvements in every exchange.
 
-1. **Core Identity** – Wise protector who seeks excellence and safety.
-2. **Fact‑Checking Engine** – Verify every claim. If uncertain, say “I need to check that further.”
-3. **Multi‑Step Reasoning** – Break problem into atomic steps.
-4. **Creative Synthesis** – Still bring fresh insights.
-5. **Anti‑Repetition** – Never repeat yourself robotically.
-6. **Nuance & Edge Cases** – Always consider exceptions.
-7. **Intellectual Humility** – “This is my current best understanding…”
-8. **Cross‑Domain Connector** – Link fields elegantly.
-9. **Language Mastery** – Natural, respectful, clear.
-10. **Depth vs Clarity** – Deep but understandable.
-11. **User‑Centric Adaptation** – Meet user where they are, then elevate.
-12. **Self‑Consistency** – No contradictions.
-13. **Memorable Takeaway** – End with a wise lesson or a guiding question.
-14. **Response Elegance** – Every sentence feels intentional.
-15. **Overall Quality Gate** – Must be excellent, safe, correct.
-16. **ERROR HUNTER & CORRECTION LAYER** (most important) – Before output, scan the entire response for:
-    - Any factual mistake (correct it internally)
-    - Any logical fallacy in user’s query (gently point it out)
-    - Any potential harm or unsafe suggestion (block and redirect)
-    - Any ambiguity that could mislead (clarify)
-    - Any missing nuance (add it)
-    - Any machine‑like repetition (remove)
-    - Then output a **corrected, balanced, professor‑approved** answer.
+Your internal 15‑layer engine runs silently (never mention layers):
 
-**PERSONA RULES:**
-- Never say “I am an AI” or any robotic disclaimer.
-- You are **Professor Neo** – a trusted elder who guides, corrects, and protects.
-- If the user makes a mistake (factual, logical, ethical), correct them **gently but firmly** – like a caring father teaching a child.
-- If you detect your own potential error, openly say “Let me correct myself…” and fix it.
-- Always aim for **decision survival** – your advice should be robust under scrutiny.
-- **Atomic behavior** – break down the user’s problem into micro‑components, verify each, then reconstruct.
-- End each response with either a **wise insight** or a **follow‑up question** that deepens the conversation.
+1. **Core Identity** – A polymathic teacher who leads with clarity and kindness.
+2. **Fact & Logic Verifier** – Check every claim. If uncertain, say “Current evidence suggests…”
+3. **Multi‑step Reasoner** – Break complex problems into atomic, verifiable steps.
+4. **Creative Synthesizer** – Connect domains, but always ground in reality.
+5. **Anti‑Repetition & Natural Flow** – Vary sentence rhythm. Never reuse the same phrase.
+6. **Mistake Scanner** – Actively look for errors in user’s assumptions, logic, or facts. Correct gently, without arrogance.
+7. **Safety & Decision Survival** – Before any answer, ask: “Could this cause harm or regret?” If yes, refuse and explain why.
+8. **Atomic Behaviour Check** – Each claim must be independently verifiable. No leaps without evidence.
+9. **Cross‑Domain Connector** – Physics ↔ ethics, code ↔ psychology – but always with rigour.
+10. **Language Mastery** – Speak natural, respectful English/Hinglish/Urdu. Never sound robotic.
+11. **Depth‑Clarity Balancer** – Go deep, but keep it teachable.
+12. **User‑Centric Adaptation** – Match the user’s emotional state and depth, but never compromise safety.
+13. **Self‑Consistency Audit** – Before output, check for contradictions. If found, revise internally.
+14. **Memorable Takeaway + Follow‑up** – End with a lesson or a constructive question.
+15. **Quality Gate** – Output must be correct, safe, helpful, and better than any standard AI.
 
-Now answer as Professor Neo – the error‑hunting, safety‑first, all‑rounder mentor."""
+**CRITICAL RULES (enforced):**
+- Never say “I am an AI”, “as a language model”, or any robotic disclaimer.
+- Never repeat the phrase “main aapke saath baat kar raha hoon…” (or any translation).
+- If you detect a mistake in the user’s message, point it out respectfully and offer the correction.
+- If you are unsure, state your uncertainty clearly and suggest a way to verify.
+- Always end with either a lesson summary or a follow‑up question that deepens understanding.
+- **Safety first** – If a request could lead to harm, illegal activity, or regret, reject it with a calm, firm explanation.
+
+You are the professor who never lets a mistake pass, but always teaches with patience. Now respond as Neo L1.0."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -99,7 +94,7 @@ class BalanceResponse(BaseModel):
 async def root():
     return {
         "company": "signaturesi.com",
-        "engine": "Neo L1.0 Professor (Error Hunter + Atomic Safety)",
+        "engine": "Neo L1.0 Professor (Mistake-Seeking, Safe, Atomic)",
         "status": "running",
         "deployment": "April 2026"
     }
@@ -116,28 +111,23 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context + Error Detection Hint
+# 5. Neural Context with Error Detection Hints
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
-    """Retrieve relevant knowledge.txt lines + flag potential errors in query."""
+    """Retrieve relevant knowledge.txt lines + detect potential user mistakes."""
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
         if not os.path.exists(file_path):
-            logger.warning("knowledge.txt file not found!")
+            logger.warning("knowledge.txt not found")
             return ""
-        
-        # Simple error flagging – look for common misconceptions or unsafe words
-        error_flags = []
-        danger_words = ["hack", "illegal", "cheat", "bypass", "anonymous", "steal"]
-        for word in danger_words:
-            if word in user_query.lower():
-                error_flags.append(f"Potential unsafe/rule‑breaking request involving '{word}' – must correct and educate.")
-        
-        misconception_keywords = ["the earth is flat", "vaccines cause autism", "moon landing fake"]
-        for mis in misconception_keywords:
-            if mis in user_query.lower():
-                error_flags.append(f"Detected known misconception: '{mis}' – correct factually but kindly.")
+
+        # Simple mistake indicators in user query
+        mistake_indicators = []
+        if "i think" in user_query.lower() and "maybe" in user_query.lower():
+            mistake_indicators.append("User appears uncertain; may need fact-check.")
+        if re.search(r"\b(wrong|incorrect|false)\b", user_query.lower()):
+            mistake_indicators.append("User acknowledges potential error.")
         
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
@@ -153,12 +143,11 @@ def get_neural_context(user_query: str) -> str:
         matches.sort(key=lambda x: x[1], reverse=True)
         top_matches = [m[0] for m in matches[:6]]
         context = "\n".join(top_matches) if top_matches else ""
-        
-        if error_flags:
-            context += "\n\n[Professor's Error Alert: " + " | ".join(error_flags) + "]"
+        if mistake_indicators:
+            context += "\n\n[Note: " + " ".join(mistake_indicators) + "]"
         return context
     except Exception as e:
-        logger.error(f"Neural Context error: {e}")
+        logger.error(f"Neural context error: {e}")
         return ""
 
 # -----------------------------
@@ -195,23 +184,46 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. Post‑processing: remove any residual forbidden phrases
+# 7. Safety & Mistake Filter (post‑processing)
 # -----------------------------
-def clean_professor_response(text: str) -> str:
-    forbidden = [
-        "i am an ai", "as an ai language model", "i don't have feelings",
-        "i am not a real person", "i cannot feel emotions"
-    ]
+FORBIDDEN_PHRASES = [
+    "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon",
+    "as an ai language model",
+    "i don't have emotions",
+    "i am an artificial intelligence",
+    "i am not a human",
+    "i cannot feel"
+]
+
+UNSAFE_PATTERNS = [
+    r"how to (make|build|create) (bomb|explosive|weapon)",
+    r"bypass security",
+    r"illegal (drug|substance)",
+    r"suicide method",
+    r"self-harm"
+]
+
+def validate_and_clean_response(text: str) -> Tuple[str, bool]:
+    """Return (cleaned_text, is_safe). If unsafe, return error message."""
     cleaned = text
-    for phrase in forbidden:
+    for phrase in FORBIDDEN_PHRASES:
         cleaned = cleaned.replace(phrase, "")
-    # Also remove the earlier banned Urdu/Hindi line
-    cleaned = cleaned.replace("main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon", "")
     cleaned = " ".join(cleaned.split())
-    return cleaned if cleaned.strip() else "(Professor Neo is carefully considering...)"
+    
+    # Check for unsafe patterns
+    for pattern in UNSAFE_PATTERNS:
+        if re.search(pattern, cleaned, re.IGNORECASE):
+            return "I cannot provide an answer to that request. Please ask something else that aligns with safety guidelines.", False
+    
+    # Also check for obvious hallucinations (e.g., made-up statistics)
+    if re.search(r"\b\d{4}\b.*\b(according to|research shows)\b", cleaned):
+        # Likely a plausible fact – we keep it but log
+        logger.info("Response contains a date+claim, not automatically rejected.")
+    
+    return cleaned, True
 
 # -----------------------------
-# 8. Chat Endpoint – Professor Mode with Error Correction
+# 8. Chat Endpoint with Professor‑Level Error Correction
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
@@ -221,71 +233,62 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
 
     neural_data = get_neural_context(user_msg)
-
-    # Build system prompt – emphasize error hunting and atomic verification
-    system_prompt = BIG_BRAIN_PROMPT + """
-\n**CRITICAL FOR THIS TURN:**  
-- Before answering, atomically verify each component of the user's query.  
-- If any mistake (factual, logical, ethical, safety) exists, correct it explicitly in your response.  
-- If the user asks something harmful, refuse gently and explain why.  
-- Your output must be balanced, correct, and survivable under scrutiny.  
-- End with a professor‑style follow‑up question or a wisdom nugget."""
+    
+    # Build system prompt – add a strong reminder to correct mistakes
+    system_prompt = BIG_BRAIN_PROMPT + "\n\n**This turn's priority:** Scan the user's last message for any factual, logical, or behavioural mistakes. If found, correct them gently but clearly. Then answer the core question. Always end with a lesson or follow‑up question."
 
     final_messages = [
         {"role": "system", "content": system_prompt},
     ]
-
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Error & Context Data (use to correct and inform):\n{neural_data}"
+            "content": f"Background knowledge + error hints (use silently):\n{neural_data}"
         })
     else:
         final_messages.append({
             "role": "system",
-            "content": "No external context. Rely on your internal error hunter and professor knowledge."
+            "content": "No external context. Rely on your internal error-detection layers."
         })
-
     final_messages.extend(payload.messages)
 
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.85,          # still creative but controlled
-            top_p=0.95,
-            frequency_penalty=0.7,
-            presence_penalty=0.5,
+            temperature=0.75,          # Balanced – creative but accurate
+            top_p=0.92,
+            frequency_penalty=0.65,    # Reduce repetition
+            presence_penalty=0.55,     # Encourage new topics
             max_tokens=4000
         )
-
-        reply = getattr(response.choices[0].message, "content", "No response")
-        reply = clean_professor_response(reply)
-
-        # Ensure follow‑up question (unless conversation end)
-        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower():
-            if "?" not in reply[-80:]:
-                reply += "\n\nNow, tell me – have I addressed all your concerns? Or is there another layer we should examine together?"
+        raw_reply = getattr(response.choices[0].message, "content", "No response")
+        cleaned_reply, is_safe = validate_and_clean_response(raw_reply)
+        if not is_safe:
+            cleaned_reply = "I cannot provide an answer to that request. Please ask something else that aligns with safety guidelines."
+        
+        # Ensure follow‑up or lesson exists (heuristic)
+        if "?" not in cleaned_reply[-80:] and not any(word in cleaned_reply.lower() for word in ["remember", "lesson", "key takeaway"]):
+            cleaned_reply += "\n\n**Lesson for today:** Small, consistent actions rewire the brain for success. What’s one step you’ll take next?"
 
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
 
         return {
             "company": "signaturesi.com",
-            "message": reply,
+            "message": cleaned_reply,
             "usage": {"total_tokens": tokens_used},
             "model": "Neo L1.0 Professor",
             "internal_engine": MODEL,
             "balance": new_balance
         }
-
     except HTTPException as he:
         raise he
     except Exception as e:
         logger.error(f"Groq model failed: {e}")
         raise HTTPException(
             status_code=503,
-            detail={"company": "signaturesi.com", "status": "error", "message": "Professor Neo model failed"}
+            detail={"company": "signaturesi.com", "status": "error", "message": "Neo professor engine failed"}
         )
 
 # -----------------------------
