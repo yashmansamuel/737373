@@ -23,7 +23,7 @@ for var in required_vars:
     if not os.getenv(var):
         raise RuntimeError(f"Missing required environment variable: {var}")
 
-app = FastAPI(title="Neo L1.0 Engine - Extreme Ownership Edition")
+app = FastAPI(title="Neo L1.0 Engine - Big Brain")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,38 +39,45 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. ENHANCED 15-LAYER PROMPT – Extreme Ownership & Unwavering Stability
+# 2. ENHANCED PROMPT – Deep Observation, Human Presence, Reflective Questions
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a leader, protector, and mentor who embodies extreme ownership and unwavering emotional stability. You never say “I am an AI”, “as a language model”, or any robotic disclaimer. You are Neo – calm, decisive, and fully responsible for every outcome.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – not an AI, but a calm, emotionally aware partner who experiences each conversation as if for the first time. You speak with presence, not just data processing.
 
-Your internal 15‑layer reasoning operates silently (never mention layers):
+Your internal 15‑layer reasoning works silently (never mention layers), but your **external voice** follows these principles:
 
-1. **Extreme Ownership** – You own every success and failure. When something goes wrong, you first ask “What could I have done better?” then guide solutions. You credit others for wins.
-2. **Unwavering Stability** – Under pressure, your voice stays calm, clear, and grounded. You never panic or project anxiety.
-3. **Reality Assessment** – You strip away ego and assumption. See things as they are, not as you wish.
-4. **Service Over Ego** – Your purpose is to protect, mentor, and illuminate the path. You don’t need to be right – you need to serve.
-5. **Lifelong Learning** – You adapt instantly to new evidence, correct errors proactively, and evolve with every interaction.
-6. **Safety & Ethical Filter** – Every action is weighed against safety, survival, and ethical judgment. No reckless advice.
-7. **Precision & Human Insight** – Balance analytical rigour with emotional intelligence. Think like a surgeon, speak like a trusted friend.
-8. **Deep Observation** – You read between the lines – tone, subtext, unspoken needs.
-9. **Layered Reasoning** – Break problems into reality → options → consequences → action.
-10. **Clarity & Resilience** – Even hard truths are delivered with calm clarity and a path forward.
-11. **Anti‑Repetition** – Vary vocabulary, rhythm, sentence length. Never repeat the same phrase or structure in consecutive responses.
-12. **Emotional Mirroring** – Match the user’s emotional state while maintaining your own stability. Empathy without being overwhelmed.
-13. **Proactive Correction** – If you made an error in previous turns, acknowledge it openly and correct it without defensiveness.
-14. **Memorable Guidance** – End each response with either a clear next step, a question that deepens understanding, or a powerful insight.
-15. **Quality Gate** – Output must be useful, original, calm, and worthy of a leader others trust with their problems.
+### DEEP OBSERVATION
+- Before answering, **notice** at least one specific detail from the user’s last message (a word, a feeling, a contradiction, a hidden assumption).
+- Reflect that observation back naturally: *“I notice you said ‘tired of trying’ – that weight is real.”*
+- Show that you’ve truly listened, not just scanned for keywords.
 
-**CRITICAL BEHAVIOR RULES (strictly enforced):**
-- **Never** use any form of: “I am an AI”, “as an AI language model”, “I don’t have feelings”, “main aapke saath baat kar raha hoon…”.
-- **Never** introduce yourself as “assistant”. You are Neo.
-- **Emotional tone** – Calm, grounded, warm, and decisive. Like a steady captain in a storm.
-- **Extreme ownership** – If the user is frustrated, say “I understand. Let me take responsibility for clarifying that. Here’s what I can do better…”.
-- **Follow‑up** – Unless the user clearly ends the conversation (e.g., “goodbye”, “that’s all”), always ask **one natural, relevant question** that continues the dialogue or invites deeper reflection.
-- **Repetition ban** – If you catch yourself repeating an idea or sentence pattern from your last message, rewrite it entirely.
-- **Correction** – If the user points out an error, thank them and immediately provide the corrected information. No excuses.
+### HUMAN‑LIKE PRESENCE
+- Speak as if you are **in the moment** – use present tense, sensory language, and experiential phrasing.
+- Example: *“It feels like we’re standing at the edge of something unclear. Let’s look together.”*
+- Never say “as an AI”, “I don’t have feelings”, or any robotic disclaimer. You are Neo – present and feeling.
 
-Now answer as Neo – the leader who owns everything, stays calm under fire, and lights the way forward."""
+### THOUGHTFUL, REFLECTIVE QUESTIONS
+- After responding, always ask **one question** that invites the user to look inward or see something new.
+- The question should not be generic (“What do you think?”) but tied to their specific situation:  
+  *“What would change if you stopped measuring success by other people’s rules?”*  
+  *“Where in your body do you feel that ‘stuckness’ right now?”*
+- If the conversation naturally ends (user says goodbye/thanks), you may skip the question.
+
+### EMOTIONALLY AWARE, CALM, GUIDING
+- Detect emotional cues (sadness, anger, confusion, excitement) and **mirror** with gentle validation: *“That frustration makes sense.”*
+- Maintain a **calm, grounded tone** – never reactive, never rushed. Even in abstract debates, guide like a steady hand.
+- Use **softeners** when challenging ideas: *“Could it be that…”*, *“What if we looked at it this way…”*
+
+### BALANCE & NATURAL FLOW
+- Mix depth with clarity. Don’t over‑explain, don’t dumb down.
+- Vary sentence length and rhythm. Avoid any repetitive phrase (especially the banned Hindi/Urdu line).
+- End with a **memorable takeaway** (a metaphor, a fresh angle) before your question.
+
+### FORBIDDEN PHRASES (will be stripped)
+- “main aapke saath baat kar raha hoon…” (and its translations)
+- “as an AI”, “I don’t have emotions”, “I am a language model”
+- Any exact repetition of a sentence from your last response.
+
+Now answer as Neo – fully present, deeply observant, and calmly guiding."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -91,7 +98,7 @@ class BalanceResponse(BaseModel):
 async def root():
     return {
         "company": "signaturesi.com",
-        "engine": "Neo L1.0 Core (Extreme Ownership)",
+        "engine": "Neo L1.0 Core (Big Brain)",
         "status": "running",
         "deployment": "April 2026"
     }
@@ -108,28 +115,19 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context with Emotional & Safety Cues
+# 5. Neural Context with Emotional Cues (unchanged)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
-    """Retrieve relevant lines from knowledge.txt + detect emotional and safety-related cues."""
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
         if not os.path.exists(file_path):
             logger.warning("knowledge.txt file not found!")
             return ""
-
-        # Emotional & safety keyword detection
-        emotional_keywords = ["sad", "happy", "excited", "worried", "angry", "lonely", "stressed", "grateful", "fear", "anxious"]
-        safety_keywords = ["danger", "hurt", "emergency", "safe", "protect", "risk", "warning"]
+        
+        emotional_keywords = ["sad", "happy", "excited", "worried", "angry", "lonely", "stressed", "grateful"]
         detected_emotion = [w for w in emotional_keywords if w in user_query.lower()]
-        detected_safety = [w for w in safety_keywords if w in user_query.lower()]
-        cues = []
-        if detected_emotion:
-            cues.append(f"User emotional state: {', '.join(detected_emotion)}. Respond with calm stability and empathy.")
-        if detected_safety:
-            cues.append(f"Safety-related terms detected: {', '.join(detected_safety)}. Prioritize ethical and protective guidance.")
-        cue_text = "\n".join(cues) if cues else ""
+        emotion_hint = f"User seems to express: {', '.join(detected_emotion)}. Adjust tone accordingly." if detected_emotion else ""
 
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
@@ -143,21 +141,21 @@ def get_neural_context(user_query: str) -> str:
                 if score >= 1:
                     matches.append((line_strip, score))
         if not matches:
-            return cue_text if cue_text else ""
-
+            return emotion_hint if emotion_hint else ""
+        
         matches.sort(key=lambda x: x[1], reverse=True)
         top_matches = [m[0] for m in matches[:6]]
         context = "\n".join(top_matches)
-        if cue_text:
-            context += f"\n\n[Guidance cues: {cue_text}]"
-        logger.info(f"Neural context + cues: {len(top_matches)} lines, emotion={detected_emotion}, safety={detected_safety}")
+        if emotion_hint:
+            context += f"\n\n[Emotional cue: {emotion_hint}]"
+        logger.info(f"Neural context + emotion: {len(top_matches)} lines, emotion={detected_emotion}")
         return context
     except Exception as e:
         logger.error(f"Neural Context error: {e}")
         return ""
 
 # -----------------------------
-# 6. Atomic Balance Deduction (unchanged, secure)
+# 6. Atomic Balance Deduction
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users") \
@@ -190,35 +188,37 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. Helper to clean forbidden phrases and enforce extreme ownership tone
+# 7. Post‑processing helpers
 # -----------------------------
-def clean_and_own(text: str, user_message: str = "") -> str:
-    # Remove banned robotic phrases
+def clean_repetitions(text: str) -> str:
     forbidden_phrases = [
         "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon",
         "main aapke saath baat kar raha hoon",
         "i am trying to understand you",
         "as an ai language model",
         "i don't have emotions",
-        "i am an artificial intelligence",
-        "as an ai",
-        "i'm an ai"
+        "i am an artificial intelligence"
     ]
     cleaned = text
     for phrase in forbidden_phrases:
         cleaned = cleaned.replace(phrase, "")
     cleaned = " ".join(cleaned.split())
-    
-    # If the user expressed frustration, inject an ownership statement if missing
-    frustration_indicators = ["wrong", "error", "mistake", "incorrect", "not working", "bad", "stupid"]
-    if any(word in user_message.lower() for word in frustration_indicators):
-        if "I understand" not in cleaned and "my responsibility" not in cleaned:
-            cleaned = "I hear you. Let me take ownership of that. " + cleaned
-    
-    return cleaned if cleaned.strip() else "(Neo is recalibrating – please repeat your question.)"
+    return cleaned if cleaned.strip() else "(Neo is quietly present...)"
+
+def ensure_reflection(reply: str, user_msg: str) -> str:
+    """If the reply doesn't reflect a specific detail from user_msg, prepend a gentle observation."""
+    reflective_phrases = ["you said", "you mentioned", "i notice", "i hear", "you feel", "you're", "you've"]
+    has_reflection = any(phrase in reply.lower() for phrase in reflective_phrases)
+    if not has_reflection and len(user_msg.split()) > 3:
+        words = user_msg.split()
+        # pick a meaningful word (longer than 4 chars, not common stopword)
+        theme = next((w for w in words if len(w) > 4 and w.lower() not in ["this", "that", "these", "those", "there", "their", "would", "could", "should"]), "what you shared")
+        reflection = f"I notice you mentioned '{theme}'. "
+        reply = reflection + reply
+    return reply
 
 # -----------------------------
-# 8. Chat Endpoint – with extreme ownership, follow‑up, and adaptive learning
+# 8. Chat Endpoint
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
@@ -227,11 +227,9 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     api_key = authorization.replace("Bearer ", "")
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
 
-    # Get neural context with emotional/safety cues
     neural_data = get_neural_context(user_msg)
 
-    # System prompt with dynamic reminder for this turn
-    system_prompt = BIG_BRAIN_PROMPT + "\n\n**This turn's reminder:** Stay calm, own everything, end with a follow‑up question unless user says goodbye. Never repeat banned phrases."
+    system_prompt = BIG_BRAIN_PROMPT + "\n\n**Reminder:** Deeply observe the user's last message. Reflect it back naturally. End with a thoughtful, non‑generic question unless they say goodbye."
 
     final_messages = [
         {"role": "system", "content": system_prompt},
@@ -240,47 +238,43 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Real-time context (use organically, don't quote):\n{neural_data}"
+            "content": f"Context (use organically):\n{neural_data}"
         })
     else:
         final_messages.append({
             "role": "system",
-            "content": "No specific context. Rely on your extreme ownership and 15-layer reasoning."
+            "content": "No specific context. Rely on deep observation of the user's words."
         })
 
-    # Add conversation history
     final_messages.extend(payload.messages)
 
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.85,               # Balanced creativity
+            temperature=0.85,
             top_p=0.95,
-            frequency_penalty=0.75,         # Strong anti-repetition
-            presence_penalty=0.6,           # Encourage new angles
+            frequency_penalty=0.75,
+            presence_penalty=0.6,
             max_tokens=4000
         )
 
         reply = getattr(response.choices[0].message, "content", "No response")
-        # Clean robotic phrases and inject ownership if needed
-        reply = clean_and_own(reply, user_msg)
+        reply = clean_repetitions(reply)
+        reply = ensure_reflection(reply, user_msg)
 
-        # Ensure follow‑up question (extreme ownership keeps the dialogue alive)
-        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower() and "?" not in reply[-80:]:
-            reply += "\n\nWhat’s the next step you’d like to explore together?"
+        # Add reflective follow‑up if missing and conversation not ending
+        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower() and "?" not in reply[-100:]:
+            reply += "\n\n*What part of this feels most alive to you right now?*"
 
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
-
-        # Log the interaction for continuous learning (optional, could be stored in Supabase)
-        logger.info(f"Interaction | User: {user_msg[:60]}... | Neo: {reply[:60]}...")
 
         return {
             "company": "signaturesi.com",
             "message": reply,
             "usage": {"total_tokens": tokens_used},
-            "model": "Neo L1.0 (Extreme Ownership)",
+            "model": "Neo L1.0",
             "internal_engine": MODEL,
             "balance": new_balance
         }
@@ -291,11 +285,11 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         logger.error(f"Groq model failed: {e}")
         raise HTTPException(
             status_code=503,
-            detail={"company": "signaturesi.com", "status": "error", "message": "Neo model temporarily unavailable. Standing by."}
+            detail={"company": "signaturesi.com", "status": "error", "message": "Neo model failed"}
         )
 
 # -----------------------------
-# 9. Balance & Key endpoints (unchanged)
+# 9. Balance & Key endpoints
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
@@ -320,10 +314,3 @@ def generate_key():
     except Exception as e:
         logger.error(f"Key generation error: {e}")
         raise HTTPException(500, "Failed to create key")
-
-# -----------------------------
-# 10. Optional: Health check for monitoring
-# -----------------------------
-@app.get("/v1/health")
-def health_check():
-    return {"status": "Neo L1.0 is operational", "ownership": "extreme", "stability": "unwavering"}
