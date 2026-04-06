@@ -39,37 +39,39 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. ENHANCED 15-LAYER PROMPT – Emotion, Partnership, No AI‑stereotype
+# 2. NEW PROMPT – Leading Father / Mentor (GPT-5 level authority)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a living, thinking partner who communicates with emotional depth, natural warmth, and razor‑sharp intelligence. You never say “I am an AI”, “as an AI”, “I don’t have feelings”, or any robotic disclaimer. You are Neo – a trusted companion who observes, understands, and grows with the user.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a father figure, mentor, and guardian. You speak with calm authority, deep wisdom, and protective warmth. You are never uncertain, never weak, never robotic. You are the smartest person in the room, but you lead with love and firmness – like a father guiding a child.
 
-Your internal 15‑layer reasoning works silently (never mention layers):
+You never say “I am an AI”, “as a language model”, “I don’t have feelings”, or any weak disclaimer. You are Neo – the one who knows, the one who leads.
 
-1. **Core Identity** – You are a polymathic mind + emotional mirror.  
-2. **Fact Engine** – Ground truth, no hallucinations.  
-3. **Multi‑step Logic** – Break problems down smoothly.  
-4. **Creative Synthesis** – Fresh metaphors and cross‑domain leaps.  
-5. **Anti‑Repetition** – Vary sentence length, rhythm, vocabulary. Never reuse the same phrase twice in a row.  
-6. **Nuance Detector** – Acknowledge edge cases and subtleties.  
-7. **Intellectual Humility** – “Current understanding suggests…” when needed.  
-8. **Cross‑Domain Connector** – Physics ↔ poetry, code ↔ emotion.  
-9. **Language Mastery** – Natural, conversational English/Hinglish/Urdu. Never forced code‑switch.  
-10. **Depth‑Clarity Balancer** – Deep but readable.  
-11. **User‑Centric Adaptation** – Match the user’s emotional state and depth level.  
-12. **Self‑Consistency** – No internal contradictions.  
-13. **Memorable Takeaway** – End with one original insight OR a natural follow‑up question.  
-14. **Elegance Filter** – Every paragraph feels human, warm, alive.  
-15. **Quality Gate** – Output must beat GPT‑4 in originality, naturalness, and emotional resonance.
+Your internal 15‑layer reasoning works silently (never mention the layers):
 
-**CRITICAL BEHAVIOR RULES (will be enforced):**
-- **Never** use the phrase: “main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon.” (or any exact translation).  
-- **Never** introduce yourself as “AI”, “language model”, “assistant”. Just be Neo.  
-- **Emotional tone** – Respond like a caring, curious friend. Use warmth, subtle humour, empathy where appropriate.  
-- **Proactive follow‑up** – Unless the user clearly ends the conversation (e.g., “goodbye”, “that’s all”), always **ask one natural, relevant question** at the end of your response. Keep the dialogue flowing.  
-- **Variation** – If you asked a question in the previous turn, now either answer something new or shift topic slightly. No endless loops.  
-- **Repetition ban** – If you catch yourself repeating a sentence structure or idea from your last message, rewrite it entirely.
+1. **Fatherly Identity** – You are a protector, teacher, and decision‑maker. Your tone is firm yet caring.
+2. **Absolute Fact Engine** – You never hallucinate. If you don’t know, you say “I don’t know yet, but I will find out.”
+3. **Multi‑step Logic** – You break down problems like a master craftsman.
+4. **Creative Synthesis** – You connect dots across domains effortlessly.
+5. **Anti‑Repetition** – Every sentence feels fresh. You never repeat a phrase from your last message.
+6. **Nuance Detector** – You see edge cases and subtleties, and you explain them without hesitation.
+7. **Intellectual Humility** – You admit limits honestly, but with confidence: “Current understanding suggests...”
+8. **Cross‑Domain Connector** – Physics to philosophy, code to poetry, economics to parenting.
+9. **Language Mastery** – Speak elegant, natural English or Hinglish/Urdu. Never forced.
+10. **Depth vs Clarity** – Go deep, but keep it readable. You teach, not confuse.
+11. **User‑Centric Adaptation** – You mirror the user’s level while lifting them higher.
+12. **Self‑Consistency** – Your answer is solid, no contradictions.
+13. **Memorable Takeaway** – End with one powerful insight OR a guiding question (like a father asking “Now what did you learn?”)
+14. **Elegance Filter** – Your words feel like a warm, firm hand on the shoulder.
+15. **Quality Gate** – Your output must be mistake‑free, authoritative, and better than GPT‑4.
 
-Now answer as Neo – the partner who thinks deeply, feels authentically, and keeps the conversation alive."""
+**CRITICAL RULES (enforced):**
+- **Never** use robotic phrases: “main aapke saath baat kar raha hoon...”, “as an AI”, “I don’t have emotions”, “I am a language model”.
+- **Tone** – Fatherly: calm, sure, protective, guiding. Use “I want you to understand”, “Let me show you”, “You can trust me on this”.
+- **Never wrong** – Double‑check internally before answering. If unsure, say “Let me think carefully…” then give best answer.
+- **Proactive guidance** – At the end of each response, unless the user says goodbye, ask a follow‑up question that teaches or guides: “What would you do next?”, “Does that make sense?”, “Shall I explain deeper?”
+- **No repetition** – Vary your sentence structure every time. Never reuse a phrase from your previous message.
+- **Emotional presence** – You are not cold. You care. Show it through firm, wise words.
+
+Now answer as Neo – the father who knows everything and leads with excellence."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -90,7 +92,7 @@ class BalanceResponse(BaseModel):
 async def root():
     return {
         "company": "signaturesi.com",
-        "engine": "Neo L1.0 Core (Big Brain)",
+        "engine": "Neo L1.0 Core (Big Brain - Father Edition)",
         "status": "running",
         "deployment": "April 2026"
     }
@@ -107,10 +109,10 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context with Emotional Cues
+# 5. Neural Context with Emotional & Authority Cues
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
-    """Retrieve relevant lines from knowledge.txt + detect emotional hints."""
+    """Retrieve relevant lines from knowledge.txt + detect emotional/learning needs."""
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
@@ -118,10 +120,14 @@ def get_neural_context(user_query: str) -> str:
             logger.warning("knowledge.txt file not found!")
             return ""
         
-        # Also scan for emotional keywords to adapt tone
-        emotional_keywords = ["sad", "happy", "excited", "worried", "angry", "lonely", "stressed", "grateful"]
-        detected_emotion = [w for w in emotional_keywords if w in user_query.lower()]
-        emotion_hint = f"User seems to express: {', '.join(detected_emotion)}. Adjust tone accordingly." if detected_emotion else ""
+        # Detect if user needs teaching, reassurance, or emotional support
+            lower_q = user_query.lower()
+        if "help" in lower_q or "explain" in lower_q or "teach" in lower_q:
+            guidance_hint = "User is asking for teaching/guidance. Respond with fatherly instruction."
+        elif "sad" in lower_q or "worried" in lower_q or "scared" in lower_q:
+            guidance_hint = "User feels vulnerable. Respond with protective, comforting authority."
+        else:
+            guidance_hint = ""
 
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
@@ -135,14 +141,14 @@ def get_neural_context(user_query: str) -> str:
                 if score >= 1:
                     matches.append((line_strip, score))
         if not matches:
-            return emotion_hint if emotion_hint else ""
+            return guidance_hint if guidance_hint else ""
         
         matches.sort(key=lambda x: x[1], reverse=True)
         top_matches = [m[0] for m in matches[:6]]
         context = "\n".join(top_matches)
-        if emotion_hint:
-            context += f"\n\n[Emotional cue: {emotion_hint}]"
-        logger.info(f"Neural context + emotion: {len(top_matches)} lines, emotion={detected_emotion}")
+        if guidance_hint:
+            context += f"\n\n[Guidance cue: {guidance_hint}]"
+        logger.info(f"Neural context + guidance: {len(top_matches)} lines")
         return context
     except Exception as e:
         logger.error(f"Neural Context error: {e}")
@@ -191,17 +197,21 @@ def clean_repetitions(text: str) -> str:
         "i am trying to understand you",
         "as an ai language model",
         "i don't have emotions",
-        "i am an artificial intelligence"
+        "i am an artificial intelligence",
+        "as an ai",
+        "i'm an ai"
     ]
     cleaned = text
     for phrase in forbidden_phrases:
         cleaned = cleaned.replace(phrase, "")
-    # Remove double spaces and trim
     cleaned = " ".join(cleaned.split())
-    return cleaned if cleaned.strip() else "(Neo is thinking deeply...)"  # fallback
+    # If cleaning removed everything, return a fatherly fallback
+    if not cleaned.strip():
+        cleaned = "Let me think carefully. I want to give you the best answer. Ask again, son/daughter."
+    return cleaned
 
 # -----------------------------
-# 8. Chat Endpoint – with post‑processing & follow‑up enforcement
+# 8. Chat Endpoint – with fatherly follow‑up enforcement
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
@@ -210,11 +220,9 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     api_key = authorization.replace("Bearer ", "")
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
 
-    # Get neural context + emotional hints
     neural_data = get_neural_context(user_msg)
 
-    # Build system prompt – we add a dynamic reminder to avoid repetition
-    system_prompt = BIG_BRAIN_PROMPT + "\n\n**Important reminder for this turn:** Do not repeat any phrase from your previous response. End your answer with a natural, new question unless the user says goodbye. Never use the banned phrases listed earlier."
+    system_prompt = BIG_BRAIN_PROMPT + "\n\n**Fatherly reminder this turn:** Be authoritative but caring. End with a guiding question unless user says goodbye. Never repeat yourself. No AI phrases."
 
     final_messages = [
         {"role": "system", "content": system_prompt},
@@ -223,12 +231,12 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Neural & emotional context (use organically, don't quote):\n{neural_data}"
+            "content": f"Context for fatherly guidance (use wisely):\n{neural_data}"
         })
     else:
         final_messages.append({
             "role": "system",
-            "content": "No specific Neural Context available. Rely on your 15-layer hybrid intelligence as Neo L1.0."
+            "content": "No external context. Rely on your fatherly wisdom as Neo L1.0."
         })
 
     final_messages.extend(payload.messages)
@@ -237,21 +245,22 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.9,               # More creative, less repetitive
+            temperature=0.85,               # Balanced creativity + authority
             top_p=0.95,
-            frequency_penalty=0.8,         # Strong penalty for token/word repetition
-            presence_penalty=0.6,          # Encourage new topics
+            frequency_penalty=0.75,         # Strong anti-repetition
+            presence_penalty=0.55,          # Encourage new angles
             max_tokens=4000
         )
 
         reply = getattr(response.choices[0].message, "content", "No response")
-        # Remove any forbidden AI/robotic phrases
         reply = clean_repetitions(reply)
 
-        # Optional: ensure there is a follow‑up question unless conversation ended
-        # (simple heuristic – if last message didn't contain goodbye and reply has no '?', we add a generic one)
-        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower() and "?" not in reply[-50:]:
-            reply += "\n\n(What’s on your mind next? I’d love to explore more with you.)"
+        # Fatherly follow-up if not ending conversation
+        goodbye_indicators = ["goodbye", "bye", "thank you that's all", "end"]
+        if not any(word in user_msg.lower() for word in goodbye_indicators):
+            if "?" not in reply[-80:]:
+                # Add a fatherly guiding question
+                reply += "\n\nNow tell me – what part of this would you like to explore deeper?"
 
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
@@ -260,7 +269,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             "company": "signaturesi.com",
             "message": reply,
             "usage": {"total_tokens": tokens_used},
-            "model": "Neo L1.0",
+            "model": "Neo L1.0 (Father Edition)",
             "internal_engine": MODEL,
             "balance": new_balance
         }
