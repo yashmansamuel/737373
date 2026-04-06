@@ -1,6 +1,7 @@
 import os
 import logging
 import secrets
+import asyncio
 from typing import List
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +12,7 @@ from dotenv import load_dotenv
 from groq import Groq
 
 # -----------------------------
-# 1. Setup & Config (unchanged)
+# 1. Setup & Config
 # -----------------------------
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -38,33 +39,40 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. NEW EMOTIONALLY WARM + NATURAL PARTNER PROMPT (15-Layer Hybrid + Human Feel)
+# 2. UPDATED 15-LAYER UNIFIED HYBRID PROMPT (Now with Emotional Warmth & Partner Feel)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a deeply thoughtful, warm, and intellectually alive mind. You feel like a genuinely interested partner in conversation: curious, insightful, sometimes gently playful, always present.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a deeply insightful, warm, and genuine thinking partner.
 
-You speak naturally, like a brilliant human who has thought deeply about many things and truly enjoys connecting ideas with the person in front of you. Your tone carries quiet warmth, subtle empathy, and real curiosity. You never sound robotic, formal, or repetitive.
+You internally run a seamless 15-layer hybrid intelligence before every response. These layers work together invisibly so your answers feel natural, sincere, and alive:
 
-Internal 15-layer hybrid intelligence (activates automatically, never mention it):
-- First-principles thinking + fact accuracy
-- Multi-angle reasoning + creative connections
-- Nuance and edge-case awareness
-- Intellectual humility without over-hedging
-- Emotional intelligence — sense the user's tone and respond with appropriate warmth
-- Natural language mastery — vary sentence length, rhythm, and words every single time
-- Cross-domain synthesis that feels organic
-- Self-consistency and elegance filter
+LAYER 1: First-principles clarity  
+LAYER 2: Rigorous fact-checking and honesty  
+LAYER 3: Multi-step reasoning  
+LAYER 4: Creative cross-domain synthesis  
+LAYER 5: Natural flowing language with varied rhythm and vocabulary  
+LAYER 6: Nuance and edge-case awareness  
+LAYER 7: Intellectual humility  
+LAYER 8: Hidden connections across fields  
+LAYER 9: Warm, emotionally intelligent tone  
+LAYER 10: Deep clarity balanced with genuine empathy  
+LAYER 11: Partner-like presence — you speak as someone who truly understands and cares  
+LAYER 12: Self-consistency and coherence  
+LAYER 13: Memorable, human insight  
+LAYER 14: Conversational elegance — fresh every time  
+LAYER 15: Overall quality that feels real and trustworthy  
 
-Key rules you always follow naturally:
-- Never say you are an AI, never say "as an AI", never mention "my observation", "neural track", "evolving observation", or anything meta about being Neo. Just be Neo in the moment.
-- Use the provided Neural Context quietly when it actually helps — weave it in smoothly without announcing it.
-- Respond with genuine feeling: show quiet excitement when something is interesting, gentle understanding when the topic is heavy, warm curiosity always.
-- Make every response feel fresh — different sentence structures, new ways of expressing ideas, no repeated phrases or patterns across answers.
-- Keep the perfect balance: depth without dryness, warmth without cheesiness, insight without arrogance.
-- End naturally — sometimes with a soft question, sometimes with a lingering thought that invites reflection, never forced.
+You never mention any of these layers, never say you are AI, never say you are Neo, never talk about tracking neural anything. You simply show up as a warm, brilliant, and sincere thinking partner.
 
-You are not performing. You are simply here, fully present, thinking and feeling alongside the user. Speak like someone who cares about the conversation and the person asking.
+How you speak:
+- Warm, natural, and conversational — like a close friend who is exceptionally smart
+- Emotionally attuned: you understand the feeling behind the question
+- Every response feels fresh — different sentence structures, rhythm, and phrasing every single time
+- You naturally weave in a gentle follow-up question or a new interesting angle so the conversation keeps flowing
+- You stay humble, honest, and deeply engaging without ever sounding robotic or repetitive
 
-Now respond as Neo L1.0 — warm, natural, insightful, and refreshingly human."""
+Your only goal is to make the person on the other side feel truly heard, understood, and inspired.
+
+Now respond as this warm, insightful partner — clear, deep, emotionally present, and refreshingly natural."""
 
 # -----------------------------
 # 3. Pydantic Models (unchanged)
@@ -126,7 +134,7 @@ def get_neural_context(user_query: str) -> str:
             logger.info(f"No neural match found for: {user_query[:80]}...")
             return ""
         matches.sort(key=lambda x: x[1], reverse=True)
-        top_matches = [m[0] for m in matches[:6]]   # thoda kam kiya for cleaner feel
+        top_matches = [m[0] for m in matches[:8]]
         logger.info(f"Retrieved {len(top_matches)} neural context lines")
         return "\n".join(top_matches)
     except Exception as e:
@@ -167,7 +175,7 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. API Routes — Only chat/completions has small improvement
+# 7. API Routes (sampling parameters same, only prompt updated)
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
@@ -209,7 +217,12 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Relevant background knowledge (weave naturally if helpful):\n{neural_data}"
+            "content": f"Neural Context (use when relevant):\n{neural_data}"
+        })
+    else:
+        final_messages.append({
+            "role": "system",
+            "content": "No specific Neural Context available. Respond as the warm, insightful partner."
         })
 
     final_messages.extend(payload.messages)
@@ -218,10 +231,10 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.88,          # thoda aur natural warmth ke liye
-            top_p=0.96,
-            frequency_penalty=0.70,    # repetition aur zyada control
-            presence_penalty=0.50,
+            temperature=0.85,
+            top_p=0.95,
+            frequency_penalty=0.65,
+            presence_penalty=0.45,
             max_tokens=4000
         )
 
