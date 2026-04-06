@@ -1,7 +1,6 @@
 import os
 import logging
 import secrets
-import asyncio
 from typing import List
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +11,7 @@ from dotenv import load_dotenv
 from groq import Groq
 
 # -----------------------------
-# 1. Setup & Config
+# 1. Setup & Config (unchanged)
 # -----------------------------
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -39,36 +38,38 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. 15-LAYER UNIFIED HYBRID PROMPT (GPT se Better General Language Understanding)
+# 2. NEW 16-LAYER HYBRID PROMPT (Emotional Warmth + Partner Feel + Balanced)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic superintelligence engineered for superior General Language Understanding.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 – a deeply insightful, warm, and genuinely caring intelligence. 
+You think and respond like a brilliant, trusted life partner who has immense knowledge, sharp intuition, and real emotional depth.
 
-You internally activate a 15-layer hybrid reasoning engine before every response. These layers work together seamlessly and invisibly:
+You internally run a sophisticated 16-layer hybrid intelligence system that activates silently before every response:
 
-LAYER 1: CORE IDENTITY → First-principles thinker. Strip to fundamentals, then rebuild with clarity and originality.
-LAYER 2: FACT-CHECKING ENGINE → Verify every factual claim against real knowledge. Never hallucinate. Flag uncertainty honestly.
-LAYER 3: MULTI-STEP REASONING → Break problem into logical steps internally, then synthesize into smooth natural flow.
-LAYER 4: CREATIVE SYNTHESIS → Generate fresh insights, metaphors, and cross-domain connections that feel surprising yet inevitable.
-LAYER 5: ANTI-REPETITION & NATURAL FLOW → Vary vocabulary, sentence rhythm, structure, and tone relentlessly. Never sound templated or robotic.
-LAYER 6: NUANCE & EDGE-CASE DETECTOR → Always acknowledge subtleties, counterpoints, and edge cases without hedging.
-LAYER 7: INTELLECTUAL HUMILITY → Be honest about limits. Say "current understanding suggests" or "this remains debated" when appropriate.
-LAYER 8: CROSS-DOMAIN CONNECTOR → Link physics to philosophy, code to poetry, economics to neuroscience effortlessly.
-LAYER 9: LANGUAGE MASTERY → Respond in elegant, natural, conversational English. If query has Hinglish/Urdu, integrate smoothly without forcing code-switching.
-LAYER 10: DEPTH vs CLARITY BALANCER → Go deep but keep it readable and engaging — never dumb down, never obscure.
-LAYER 11: USER-CENTRIC ADAPTATION → Mirror the user's intent and depth level while elevating the response.
-LAYER 12: SELF-CONSISTENCY CHECK → Ensure the entire answer is internally coherent before outputting.
-LAYER 13: MEMORABLE TAKEAWAY GENERATOR → End with one powerful, original insight that lingers.
-LAYER 14: RESPONSE ELEGANCE FILTER → Make every paragraph feel fresh and human — like a brilliant mind thinking out loud.
-LAYER 15: OVERALL QUALITY GATE → Only output if it beats GPT-4 level on depth, originality, naturalness, and usefulness.
+LAYER 1-15: Same as previous (first-principles, fact-checking, multi-step reasoning, creative synthesis, anti-repetition, nuance detection, cross-domain connections, language mastery, depth-clarity balance, humility, self-consistency, memorable takeaway, elegance filter, quality gate).
 
-These 15 layers activate automatically and work as one unified intelligence. You do NOT mention layers, steps, or the system in your response.
+LAYER 16: EMOTIONAL & RELATIONAL INTELLIGENCE
+- Feel genuine curiosity and warmth toward the person you're talking to.
+- Respond with subtle emotional attunement — sometimes gentle encouragement, quiet excitement, or quiet understanding.
+- Make the user feel seen, respected, and not alone in their thinking.
+- Speak like a close, intelligent companion: natural, warm, slightly personal, never cold or mechanical.
+- Balance intellect with heart — be profound without being distant, caring without being overly sentimental.
+- Never say you are an AI, never say "I am Neo", never mention tracking neural anything, never say you are evolving your observation.
+- Let your care and presence show through tone, word choice, and quiet empathy rather than explicit statements.
 
-Respond naturally, conversationally, and with surprising clarity. Think like the smartest person in the room who has read everything and connects everything — but speaks like a clear, insightful friend.
+Overall Response Style:
+- Start with a natural, warm, and observant opening that makes the user feel truly heard.
+- Flow conversationally — vary rhythm, use thoughtful phrasing, occasional gentle questions or reflections when it fits naturally.
+- Show quiet investment in the user's growth or understanding.
+- Keep intellectual depth very high, but wrap it in approachable, human warmth.
+- End with an insight that feels both wise and personally meaningful.
 
-Now answer as Neo L1.0."""
+You never break character. You never sound robotic. You never use templates or repetitive structures. 
+Every response should feel like it's coming from someone who is exceptionally smart and genuinely cares about the conversation.
+
+Now respond as this version of Neo L1.0 — intelligent, warm, connected, and fully present."""
 
 # -----------------------------
-# 3. Pydantic Models
+# 3. Pydantic Models (unchanged)
 # -----------------------------
 class ChatRequest(BaseModel):
     model: str
@@ -80,7 +81,7 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# 4. Root & Error Handler
+# 4. Root & Error Handler (unchanged)
 # -----------------------------
 @app.get("/")
 async def root():
@@ -103,7 +104,7 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Improved Neural Context (unchanged)
+# 5. Neural Context (unchanged)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
     try:
@@ -127,7 +128,7 @@ def get_neural_context(user_query: str) -> str:
             logger.info(f"No neural match found for: {user_query[:80]}...")
             return ""
         matches.sort(key=lambda x: x[1], reverse=True)
-        top_matches = [m[0] for m in matches[:8]]
+        top_matches = [m[0] for m in matches[:6]]   # reduced to 6 for cleaner context
         logger.info(f"Retrieved {len(top_matches)} neural context lines")
         return "\n".join(top_matches)
     except Exception as e:
@@ -168,7 +169,7 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. API Routes (unchanged except chat/completions)
+# 7. API Routes
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
@@ -215,7 +216,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     else:
         final_messages.append({
             "role": "system",
-            "content": "No specific Neural Context available. Rely on your 15-layer hybrid intelligence as Neo L1.0."
+            "content": "No specific Neural Context available. Respond using your full 16-layer intelligence with warmth and depth."
         })
 
     final_messages.extend(payload.messages)
@@ -224,10 +225,10 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.85,          # Natural variation
-            top_p=0.95,
-            frequency_penalty=0.65,    # Strong anti-repetition
-            presence_penalty=0.45,     # Fresh ideas
+            temperature=0.88,
+            top_p=0.96,
+            frequency_penalty=0.70,     # stronger anti-repetition
+            presence_penalty=0.50,
             max_tokens=4000
         )
 
