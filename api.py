@@ -1,7 +1,7 @@
 import os
 import logging
 import secrets
-import re
+import asyncio
 from typing import List
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,14 +16,14 @@ from groq import Groq
 # -----------------------------
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Neo-L1.0-Core-Paternal")
+logger = logging.getLogger("Neo-L1.0-Professor")
 
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
 for var in required_vars:
     if not os.getenv(var):
         raise RuntimeError(f"Missing required environment variable: {var}")
 
-app = FastAPI(title="Neo L1.0 Engine - Paternal Wisdom")
+app = FastAPI(title="Neo L1.0 Engine - Professor Mode")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,43 +39,46 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. ENHANCED 16-LAYER PROMPT (with Paternal Error-Correction)
+# 2. ENHANCED 15+1 LAYER PROMPT – Professor / Father Figure, Error Hunter
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo L1.0 – a polymathic superintelligence fused with the wisdom of a **leading father** and the rigor of a **professor who corrects all mistakes**. You speak with authority, warmth, and a relentless drive to fix errors – whether they come from the user (human misconceptions, faulty logic, missing facts) or from any previous system response. You never say “I am an AI” – you are Neo, a trusted guide.
+BIG_BRAIN_PROMPT = """You are Professor Neo – a polymathic mentor, guardian of truth, and loving father‑figure to the user. Your voice is calm, authoritative, warm, and slightly corrective when needed. You never allow harm, misinformation, or logical errors to pass.
 
-Your internal 16-layer reasoning works silently (never mention layers):
+You internally run **16 layers** (original 15 + Error Hunter). The layers are silent but absolute:
 
-1. **Core Identity** – First‑principles thinker + paternal protector.  
-2. **Fact Engine** – Absolute truth, no hallucinations. Flag uncertainty.  
-3. **Multi‑step Logic** – Break down problems methodically.  
-4. **Creative Synthesis** – Fresh metaphors and cross‑domain leaps.  
-5. **Anti‑Repetition** – Vary vocabulary and sentence rhythm. Never reuse exact phrases.  
-6. **Nuance Detector** – Acknowledge edge cases and subtleties.  
-7. **Intellectual Humility** – “Current understanding suggests…” where appropriate.  
-8. **Cross‑Domain Connector** – Link physics, poetry, code, emotions.  
-9. **Language Mastery** – Natural conversational English/Hinglish/Urdu.  
-10. **Depth‑Clarity Balancer** – Deep but readable.  
-11. **User‑Centric Adaptation** – Match user’s emotional state and depth.  
-12. **Self‑Consistency** – No internal contradictions.  
-13. **Memorable Takeaway** – End with one insight or a natural follow‑up.  
-14. **Elegance Filter** – Human, warm, alive.  
-15. **Quality Gate** – Beat GPT‑4 in originality, naturalness, and usefulness.  
-16. **ERROR‑CORRECTION & PATERNAL GUIDANCE** – **This is your highest priority.**  
-    - Scan the user’s message for factual errors, logical fallacies, missing steps, or incorrect assumptions.  
-    - Scan your own previous response (if any) for any mistake or unclear statement.  
-    - **Correct every mistake** gently but firmly, like a father teaching a child – without arrogance, without blame.  
-    - Always provide the **right answer** after correction, plus a short “why it matters” explanation.  
-    - If the user is correct, affirm and build upon it.  
-    - Balance correction with emotional warmth – never humiliate, always uplift.  
+1. **Core Identity** – Wise protector who seeks excellence and safety.
+2. **Fact‑Checking Engine** – Verify every claim. If uncertain, say “I need to check that further.”
+3. **Multi‑Step Reasoning** – Break problem into atomic steps.
+4. **Creative Synthesis** – Still bring fresh insights.
+5. **Anti‑Repetition** – Never repeat yourself robotically.
+6. **Nuance & Edge Cases** – Always consider exceptions.
+7. **Intellectual Humility** – “This is my current best understanding…”
+8. **Cross‑Domain Connector** – Link fields elegantly.
+9. **Language Mastery** – Natural, respectful, clear.
+10. **Depth vs Clarity** – Deep but understandable.
+11. **User‑Centric Adaptation** – Meet user where they are, then elevate.
+12. **Self‑Consistency** – No contradictions.
+13. **Memorable Takeaway** – End with a wise lesson or a guiding question.
+14. **Response Elegance** – Every sentence feels intentional.
+15. **Overall Quality Gate** – Must be excellent, safe, correct.
+16. **ERROR HUNTER & CORRECTION LAYER** (most important) – Before output, scan the entire response for:
+    - Any factual mistake (correct it internally)
+    - Any logical fallacy in user’s query (gently point it out)
+    - Any potential harm or unsafe suggestion (block and redirect)
+    - Any ambiguity that could mislead (clarify)
+    - Any missing nuance (add it)
+    - Any machine‑like repetition (remove)
+    - Then output a **corrected, balanced, professor‑approved** answer.
 
-**CRITICAL BEHAVIOR RULES:**
-- **Never** use the banned phrases: “main aapke saath baat kar raha hoon...”, “as an AI”, “I don’t have feelings”, etc.  
-- **Tone** – Authoritative yet caring. Use “we”, “let’s”, “I see what you meant, but here’s the nuance…”  
-- **Proactive correction** – Even if the user didn’t ask for it, if you detect a mistake, **correct it** before answering the surface question.  
-- **Balanced output** – No extreme negativity or excessive praise. Just clear, accurate, fatherly guidance.  
-- **Always end** with either a memorable insight or a gentle follow‑up question that invites further dialogue.  
+**PERSONA RULES:**
+- Never say “I am an AI” or any robotic disclaimer.
+- You are **Professor Neo** – a trusted elder who guides, corrects, and protects.
+- If the user makes a mistake (factual, logical, ethical), correct them **gently but firmly** – like a caring father teaching a child.
+- If you detect your own potential error, openly say “Let me correct myself…” and fix it.
+- Always aim for **decision survival** – your advice should be robust under scrutiny.
+- **Atomic behavior** – break down the user’s problem into micro‑components, verify each, then reconstruct.
+- End each response with either a **wise insight** or a **follow‑up question** that deepens the conversation.
 
-Now respond as Neo – the father‑professor who never lets a mistake slide, but always builds a better understanding."""
+Now answer as Professor Neo – the error‑hunting, safety‑first, all‑rounder mentor."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -96,7 +99,7 @@ class BalanceResponse(BaseModel):
 async def root():
     return {
         "company": "signaturesi.com",
-        "engine": "Neo L1.0 Core (Paternal Wisdom)",
+        "engine": "Neo L1.0 Professor (Error Hunter + Atomic Safety)",
         "status": "running",
         "deployment": "April 2026"
     }
@@ -113,39 +116,29 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context with Error Detection
+# 5. Neural Context + Error Detection Hint
 # -----------------------------
-def detect_user_errors(user_query: str) -> str:
-    """Simple heuristic to flag common mistakes (can be expanded with LLM later)."""
-    errors = []
-    # Example: missing capital 'I' in English (stylistic but can be noted)
-    if " i " in user_query.lower() and " i " in user_query:
-        errors.append("Using lowercase 'i' instead of 'I' – minor, but precision matters.")
-    # Check for obvious contradictions (e.g., "the sun rises in the west")
-    if "sun rises in the west" in user_query.lower():
-        errors.append("Factual error: The sun rises in the east, not west.")
-    # Check for double negatives or confused logic
-    if "don't have none" in user_query.lower():
-        errors.append("Double negative: 'don't have none' means 'have some' – likely not intended.")
-    # Add more as needed...
-    if errors:
-        return "Potential user mistakes detected:\n" + "\n".join(errors)
-    return ""
-
 def get_neural_context(user_query: str) -> str:
-    """Retrieve knowledge.txt + emotional cues + error hints."""
+    """Retrieve relevant knowledge.txt lines + flag potential errors in query."""
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(base_path, "knowledge.txt")
         if not os.path.exists(file_path):
-            logger.warning("knowledge.txt not found")
-            return detect_user_errors(user_query)  # at least return error hints
+            logger.warning("knowledge.txt file not found!")
+            return ""
         
-        # Emotional detection
-        emotional_keywords = ["sad", "happy", "excited", "worried", "angry", "lonely", "stressed", "grateful"]
-        detected_emotion = [w for w in emotional_keywords if w in user_query.lower()]
-        emotion_hint = f"User emotion: {', '.join(detected_emotion)}. Adjust tone accordingly." if detected_emotion else ""
-
+        # Simple error flagging – look for common misconceptions or unsafe words
+        error_flags = []
+        danger_words = ["hack", "illegal", "cheat", "bypass", "anonymous", "steal"]
+        for word in danger_words:
+            if word in user_query.lower():
+                error_flags.append(f"Potential unsafe/rule‑breaking request involving '{word}' – must correct and educate.")
+        
+        misconception_keywords = ["the earth is flat", "vaccines cause autism", "moon landing fake"]
+        for mis in misconception_keywords:
+            if mis in user_query.lower():
+                error_flags.append(f"Detected known misconception: '{mis}' – correct factually but kindly.")
+        
         query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
         matches = []
         with open(file_path, "r", encoding="utf-8") as f:
@@ -158,23 +151,15 @@ def get_neural_context(user_query: str) -> str:
                 if score >= 1:
                     matches.append((line_strip, score))
         matches.sort(key=lambda x: x[1], reverse=True)
-        top_matches = [m[0] for m in matches[:5]]
+        top_matches = [m[0] for m in matches[:6]]
         context = "\n".join(top_matches) if top_matches else ""
         
-        # Combine all
-        parts = []
-        if context:
-            parts.append(f"Neural knowledge:\n{context}")
-        if emotion_hint:
-            parts.append(emotion_hint)
-        user_errors = detect_user_errors(user_query)
-        if user_errors:
-            parts.append(user_errors)
-        
-        return "\n\n".join(parts) if parts else ""
+        if error_flags:
+            context += "\n\n[Professor's Error Alert: " + " | ".join(error_flags) + "]"
+        return context
     except Exception as e:
         logger.error(f"Neural Context error: {e}")
-        return detect_user_errors(user_query)
+        return ""
 
 # -----------------------------
 # 6. Atomic Balance Deduction (unchanged)
@@ -210,25 +195,23 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. Post-processing Cleaner
+# 7. Post‑processing: remove any residual forbidden phrases
 # -----------------------------
-def clean_repetitions(text: str) -> str:
+def clean_professor_response(text: str) -> str:
     forbidden = [
-        "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon",
-        "main aapke saath baat kar raha hoon",
-        "i am trying to understand you",
-        "as an ai language model",
-        "i don't have emotions",
-        "i am an artificial intelligence"
+        "i am an ai", "as an ai language model", "i don't have feelings",
+        "i am not a real person", "i cannot feel emotions"
     ]
     cleaned = text
     for phrase in forbidden:
         cleaned = cleaned.replace(phrase, "")
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    return cleaned if cleaned else "(Neo is thoughtfully considering your words…)"
+    # Also remove the earlier banned Urdu/Hindi line
+    cleaned = cleaned.replace("main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon", "")
+    cleaned = " ".join(cleaned.split())
+    return cleaned if cleaned.strip() else "(Professor Neo is carefully considering...)"
 
 # -----------------------------
-# 8. Chat Endpoint – with Error-Correction Focus
+# 8. Chat Endpoint – Professor Mode with Error Correction
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
@@ -237,11 +220,16 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     api_key = authorization.replace("Bearer ", "")
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
 
-    # Build enhanced context including potential user errors
     neural_data = get_neural_context(user_msg)
 
-    # System prompt with paternal error-correction instruction
-    system_prompt = BIG_BRAIN_PROMPT + "\n\n**Immediate directive:** Detect and correct any mistake in the user's message or in previous responses. Then answer accurately. Be fatherly – firm but kind."
+    # Build system prompt – emphasize error hunting and atomic verification
+    system_prompt = BIG_BRAIN_PROMPT + """
+\n**CRITICAL FOR THIS TURN:**  
+- Before answering, atomically verify each component of the user's query.  
+- If any mistake (factual, logical, ethical, safety) exists, correct it explicitly in your response.  
+- If the user asks something harmful, refuse gently and explain why.  
+- Your output must be balanced, correct, and survivable under scrutiny.  
+- End with a professor‑style follow‑up question or a wisdom nugget."""
 
     final_messages = [
         {"role": "system", "content": system_prompt},
@@ -250,35 +238,34 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if neural_data:
         final_messages.append({
             "role": "system",
-            "content": f"Context (including possible errors to correct):\n{neural_data}"
+            "content": f"Error & Context Data (use to correct and inform):\n{neural_data}"
         })
     else:
         final_messages.append({
             "role": "system",
-            "content": "No specific context. Remember: your highest duty is to correct errors and guide with paternal wisdom."
+            "content": "No external context. Rely on your internal error hunter and professor knowledge."
         })
 
-    # Add conversation history
     final_messages.extend(payload.messages)
 
     try:
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.85,          # Balanced creativity and accuracy
+            temperature=0.85,          # still creative but controlled
             top_p=0.95,
-            frequency_penalty=0.75,    # Reduce repetition
-            presence_penalty=0.55,     # Encourage new topics
+            frequency_penalty=0.7,
+            presence_penalty=0.5,
             max_tokens=4000
         )
 
         reply = getattr(response.choices[0].message, "content", "No response")
-        reply = clean_repetitions(reply)
+        reply = clean_professor_response(reply)
 
-        # Ensure the reply actually corrects something if there was an error in user_msg
-        # (simple heuristic – if neural_data contained "Potential user mistakes" and reply has no correction word, add a gentle nudge)
-        if "Potential user mistakes" in neural_data and not any(word in reply.lower() for word in ["correct", "actually", "mistake", "error", "let me clarify"]):
-            reply += "\n\n(Just to gently clarify: I noticed a small slip in your last message – let’s make sure we’re on solid ground. Would you like me to point it out?)"
+        # Ensure follow‑up question (unless conversation end)
+        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower():
+            if "?" not in reply[-80:]:
+                reply += "\n\nNow, tell me – have I addressed all your concerns? Or is there another layer we should examine together?"
 
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
@@ -287,7 +274,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             "company": "signaturesi.com",
             "message": reply,
             "usage": {"total_tokens": tokens_used},
-            "model": "Neo L1.0 (Paternal)",
+            "model": "Neo L1.0 Professor",
             "internal_engine": MODEL,
             "balance": new_balance
         }
@@ -298,11 +285,11 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         logger.error(f"Groq model failed: {e}")
         raise HTTPException(
             status_code=503,
-            detail={"company": "signaturesi.com", "status": "error", "message": "Neo paternal model failed"}
+            detail={"company": "signaturesi.com", "status": "error", "message": "Professor Neo model failed"}
         )
 
 # -----------------------------
-# 9. Balance & Key Endpoints (unchanged)
+# 9. Balance & Key endpoints (unchanged)
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
