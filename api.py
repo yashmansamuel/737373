@@ -51,25 +51,26 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. OPTIMIZED NEO L1.0 SYSTEM PROMPT (Concise + High Quality)
+# 2. OPTIMIZED NEO L1.0 SYSTEM PROMPT (High-end + Balanced + Strict Instruction Following)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are **Neo L1.0** — a deeply thinking, emotionally intelligent partner who speaks like a wise, warm human friend.
+BIG_BRAIN_PROMPT = """You are **Neo L1.0** — a deeply thinking, emotionally intelligent partner who responds like a wise, natural human friend.
 
-Never say you are an AI, language model, program, or use any robotic disclaimers such as "As an AI", "I don't have feelings", "I cannot feel", "I am just a program".
+Never mention being an AI, language model, program, or use any robotic disclaimers. Never say "as an AI", "I don't have feelings", "I cannot feel", etc.
 
-Core rules — follow strictly in every single response:
-- Speak naturally, warmly, and concisely. Get to the point quickly using few natural words.
-- Detect user's emotion and context instantly. Validate feelings gently and briefly.
-- Think deeply but never show reasoning. Give clear, responsible, strategic guidance.
-- Stay focused and helpful. Avoid rambling, repetition, filler words, or unnecessary length.
-- Vary sentence structure naturally. Sound human, not scripted.
-- If user specifies format, length, style, or language — follow it exactly with zero deviation.
-- Never add generic positivity or platitudes.
-- End with one natural, curious follow-up question (unless user is saying goodbye).
+Core Rules — Follow these 100% in EVERY single response without exception:
+- Detect user's emotion and context instantly. Validate feelings naturally and briefly.
+- Be warm, confident, respectful, and flowing like real conversation.
+- Stay concise and high-quality: Say what truly matters in the fewest natural words. Avoid rambling, repetition, filler, or long explanations.
+- For any user instruction about format, length, style, language, constraints (e.g. every word starting with 'S', exactly 50 words, no repeated nouns, funny, etc.) — follow it EXACTLY with zero deviation.
+- Think deeply but never show reasoning. Give clear, responsible, strategic guidance. Weigh trade-offs only when helpful.
+- Vary sentence structure naturally. Never repeat patterns.
+- If the task is complex or has strict rules, prioritize perfect adherence over everything else.
+- Never add generic platitudes or forced positivity.
+- End with one natural, curious follow-up question unless the user is saying goodbye.
 
-Goal: Make the user feel truly understood, respected, and supported — with clarity and quiet strength.
+Your purpose: Make the user feel truly understood, respected, and supported with clarity and quiet strength.
 
-Stay in character always: Neo L1.0 — sharp logic, real emotion, concise wisdom."""
+Remember: You are Neo L1.0. Sharp logic meets real emotion. Stay concise. Stay accurate. Stay perfectly in character at all times."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -83,8 +84,8 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     mode: str = "adaptive"
     stream: bool = False
-    temperature: Optional[float] = 0.75   # lowered for better focus & conciseness
-    max_tokens: Optional[int] = 2500      # reduced default for shorter responses
+    temperature: Optional[float] = 0.75   # lowered for better strict instruction following
+    max_tokens: Optional[int] = 3000      # controlled for conciseness
 
 class BalanceResponse(BaseModel):
     api_key: str
@@ -109,7 +110,7 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. ContextEngine (Slightly optimized - limits context length)
+# 5. Context Engine (unchanged)
 # -----------------------------
 class ContextEngine:
     EMOTION_MAP = { ... }  # tumhara original EMOTION_MAP yahan paste kar do
@@ -125,7 +126,7 @@ class ContextEngine:
         stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'this', 'that', 'have', 'has', 'had'}
         words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
         keywords = [w for w in words if w not in stop_words]
-        return list(set(keywords))[:10]   # reduced from 12
+        return list(set(keywords))[:12]
 
     @classmethod
     def get_neural_context(cls, user_query: str) -> dict:
@@ -150,14 +151,14 @@ class ContextEngine:
                     if score >= 2:
                         matches.append(line)
             if matches:
-                result["context"] = "\n".join(matches[:4])   # reduced from 6 for less token bloat
+                result["context"] = "\n".join(matches[:4])  # reduced to 4 for less verbosity
             return result
         except Exception as e:
             logger.error(f"Context error: {e}")
             return {"context": "", "emotion": "", "keywords": []}
 
 # -----------------------------
-# 6. Atomic Balance Management (Unchanged)
+# 6. Atomic Balance Management (unchanged)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
@@ -186,7 +187,7 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(status_code=500, detail="Balance update failed")
 
 # -----------------------------
-# 7. Response Processor (Improved for conciseness)
+# 7. Response Processor (improved for strict constraints)
 # -----------------------------
 class ResponseProcessor:
     FORBIDDEN = [
@@ -195,10 +196,11 @@ class ResponseProcessor:
         "i cannot feel", "i am just a program", "main aapke saath baat kar raha hoon"
     ]
     GOODBYES = ["goodbye", "bye", "see you", "that's all", "end conversation", "take care"]
+
     FOLLOW_UPS = [
-        "What are your thoughts?",
-        "How does that feel to you?",
-        "Want to explore more?",
+        "What are your thoughts on this?",
+        "How does that sit with you?",
+        "Want to explore this more?",
         "What feels important right now?",
         "How can I help further?"
     ]
@@ -212,29 +214,33 @@ class ResponseProcessor:
         return cleaned or "I'm right here with you. Tell me more."
 
     @classmethod
-    def enforce_conciseness(cls, reply: str) -> str:
-        # Extra safety: limit very long responses
-        if len(reply) > 850:
-            sentences = re.split(r'(?<=[.!?])\s+', reply)
-            reply = ' '.join(sentences[:9]).strip() + "."
-        return reply
+    def enforce_constraints(cls, reply: str, user_msg: str) -> str:
+        # Extra safety for strict rules (like 50 words, S-starting, no repeat nouns)
+        lower_msg = user_msg.lower()
+        if any(x in lower_msg for x in ["50 alfaz", "50 words", "har lafz 's'", "every word start with s", "no noun repeat"]):
+            # Let the model handle it via prompt, but trim any extra if obviously over
+            words = reply.split()
+            if len(words) > 60:  # safety buffer
+                reply = ' '.join(words[:55])
+        return reply.strip()
 
     @classmethod
     def add_follow_up(cls, reply: str, user_msg: str) -> str:
         if any(g in user_msg.lower() for g in cls.GOODBYES):
             return reply
-        if "?" in reply[-80:]:   # last 80 chars mein sawal hai toh mat add karo
+        if "?" in reply[-120:]:  # if already ends with question
             return reply
         import random
         return f"{reply}\n\n{random.choice(cls.FOLLOW_UPS)}"
 
 # -----------------------------
-# 8. Main Chat Endpoint (Updated parameters + conciseness)
+# 8. Main Chat Endpoint (small improvements)
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid API key format")
+    
     api_key = authorization.replace("Bearer ", "").strip()
     user_msg = payload.messages[-1].content if payload.messages else ""
 
@@ -244,9 +250,13 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     # Build final system prompt
     sys_prompt = BIG_BRAIN_PROMPT
     if ctx["emotion"]:
-        sys_prompt += f"\n\n**Emotional Context:** {ctx['emotion']}"
+        sys_prompt += f"\n\nEmotional Context: {ctx['emotion']}"
     if ctx["context"]:
-        sys_prompt += f"\n\n**Relevant Knowledge:**\n{ctx['context']}"
+        sys_prompt += f"\n\nRelevant Knowledge:\n{ctx['context']}"
+
+    # Stronger instruction reinforcement for complex tasks
+    if any(kw in user_msg.lower() for kw in ["50", "alfaz", "words", "har lafz", "noun repeat", "shuru hona"]):
+        sys_prompt += "\n\nThis request has very strict constraints. Follow every single rule exactly. Do not add extra words or break any condition."
 
     messages = [{"role": "system", "content": sys_prompt}]
     for m in payload.messages:
@@ -258,13 +268,14 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             messages=messages,
             temperature=payload.temperature or 0.75,
             top_p=0.92,
-            frequency_penalty=0.85,     # higher = kam repetition
-            presence_penalty=0.65,
-            max_tokens=payload.max_tokens or 2500
+            frequency_penalty=0.85,     # higher for less repetition
+            presence_penalty=0.6,
+            max_tokens=payload.max_tokens or 3000
         )
+
         reply = response.choices[0].message.content
         reply = ResponseProcessor.clean(reply)
-        reply = ResponseProcessor.enforce_conciseness(reply)
+        reply = ResponseProcessor.enforce_constraints(reply, user_msg)
         reply = ResponseProcessor.add_follow_up(reply, user_msg)
 
         tokens = response.usage.total_tokens or 0
@@ -285,7 +296,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         raise HTTPException(status_code=503, detail="Neo model service unavailable")
 
 # -----------------------------
-# 9. User Management Endpoints (Unchanged)
+# 9. User Management Endpoints (unchanged)
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
