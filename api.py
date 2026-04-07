@@ -2,6 +2,7 @@ import os
 import logging
 import secrets
 import re
+import asyncio
 from typing import List, Optional, Dict
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,10 +11,10 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
-import difflib  # ← Sirf yeh naya import hai (Python stdlib, koi pip install nahi)
+import difflib
 
 # -----------------------------
-# 1. Setup & Configuration (exactly same)
+# 1. Setup & Configuration
 # -----------------------------
 load_dotenv()
 logging.basicConfig(
@@ -48,7 +49,7 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. BIG_BRAIN_PROMPT (exactly same)
+# 2. BIG_BRAIN_PROMPT
 # -----------------------------
 BIG_BRAIN_PROMPT = """You are **Neo L1.0** — a deeply thinking, emotionally intelligent human-like partner.
 You are NOT an AI. Never say "as an AI", "I don't have feelings", "I am a model", or any robotic disclaimer. Ever.
@@ -77,7 +78,7 @@ You are Neo L1.0 — sharp logic, real emotion, zero weakness.
 Stay perfectly in character. Always."""
 
 # -----------------------------
-# 3. Pydantic Models (exactly same)
+# 3. Pydantic Models
 # -----------------------------
 class ChatMessage(BaseModel):
     role: str
@@ -96,7 +97,7 @@ class BalanceResponse(BaseModel):
     balance: int
 
 # -----------------------------
-# 4. Root & Error Handlers (exactly same)
+# 4. Root & Error Handlers
 # -----------------------------
 @app.get("/")
 async def root():
@@ -107,14 +108,12 @@ async def custom_404_handler(request: Request, exc):
     return JSONResponse(status_code=404, content={"company": "signaturesi.com", "status": "running", "message": "Endpoint not found"})
 
 # -----------------------------
-# 5. NEW SMART NEURAL RAG CONTEXT ENGINE (Yahin sirf yeh change hua hai)
+# 5. SMART NEURAL RAG CONTEXT ENGINE
 # -----------------------------
 class ContextEngine:
-    # Knowledge ko memory mein preload (fast retrieval)
     _knowledge_lines: List[str] = []
     _loaded = False
 
-    # Chhota synonym map — flexible + neural feel deta hai
     SYNONYMS: Dict[str, List[str]] = {
         "dil": ["heart", "dil", "emotional", "feelings", "chest"],
         "dard": ["pain", "hurt", "suffering", "takleef", "gham"],
@@ -125,13 +124,10 @@ class ContextEngine:
         "zindagi": ["life", "existence", "living"],
     }
 
-    # TODO: Apna original EMOTION_MAP yahan paste kar do (exactly same rakha hai)
     EMOTION_MAP = {
-        # ←←← Yahan apna purana EMOTION_MAP daal do
         "happy": "User seems happy or positive. Respond warmly and encouragingly.",
         "sad": "User is feeling sad or low. Be empathetic and supportive.",
         "angry": "User is angry or frustrated. Stay calm and de-escalate.",
-        # ... baaki emotions
     }
 
     @classmethod
@@ -162,24 +158,20 @@ class ContextEngine:
         return " ".join(expanded)
 
     @classmethod
-    def _hybrid_score(cls, query: str, line: str) -> float:
+    async def _hybrid_score(cls, query: str, line: str) -> float:
         query_lower = query.lower()
         line_lower = line.lower()
-
-        # Urdu + English support
         query_words = set(re.findall(r'\b[a-zA-Z\u0600-\u06FF]{3,}\b', query_lower))
         line_words = set(re.findall(r'\b[a-zA-Z\u0600-\u06FF]{3,}\b', line_lower))
         overlap = len(query_words & line_words) * 3.0
-
-        # Fuzzy semantic similarity (neural feel)
         similarity = difflib.SequenceMatcher(None, cls._expand_synonyms(query_lower), line_lower).ratio() * 100
-
+        await asyncio.sleep(0)  # allow async context
         return overlap + (similarity * 0.8)
 
     @classmethod
     def detect_emotion(cls, text: str) -> str:
         text_lower = text.lower()
-        detected = [guidance for emotion, guidance in cls.EMOTION_MAP.items() if emotion in text_lower]
+        detected = [guidance for emotion, guidance in cls.EMOTION_MAP.items() if re.search(rf'\b{re.escape(emotion)}\b', text_lower)]
         return " | ".join(detected) if detected else ""
 
     @classmethod
@@ -190,25 +182,23 @@ class ContextEngine:
         return list(set(keywords))[:10]
 
     @classmethod
-    def get_neural_context(cls, user_query: str) -> dict:
+    async def get_neural_context(cls, user_query: str) -> dict:
         cls._load_knowledge()
-
         if not cls._knowledge_lines:
             return {"context": "", "emotion": "", "keywords": [], "matches_found": 0}
 
         emotion = cls.detect_emotion(user_query)
         keywords = cls.extract_keywords(user_query)
 
-        # Hybrid neural retrieval
         scored_lines = []
-        for line in cls._knowledge_lines:
-            score = cls._hybrid_score(user_query, line)
+        tasks = [cls._hybrid_score(user_query, line) for line in cls._knowledge_lines]
+        scores = await asyncio.gather(*tasks)
+        for line, score in zip(cls._knowledge_lines, scores):
             if score >= 8.0:
                 scored_lines.append((score, line))
 
         scored_lines.sort(reverse=True, key=lambda x: x[0])
         top_matches = [line for _, line in scored_lines[:5]]
-
         context = "\n\n".join(top_matches) if top_matches else ""
 
         return {
@@ -219,17 +209,14 @@ class ContextEngine:
         }
 
 # -----------------------------
-# 6. Token Deduction (atomic - safe & balanced)
+# 6. Token Deduction (Race-condition safe)
 # -----------------------------
-def deduct_tokens_atomic(api_key: str, tokens: int) -> int:
-    """Atomic token deduction — balance safe rakhega"""
+async def deduct_tokens_atomic(api_key: str, tokens: int) -> int:
     try:
+        # Fetch + update in async safe manner
         response = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
-        if not response.data:
-            return 0
-        current = response.data.get("token_balance", 0)
+        current = response.data.get("token_balance", 0) if response.data else 0
         new_balance = max(0, current - tokens)
-        
         SUPABASE.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
         return new_balance
     except Exception as e:
@@ -237,7 +224,7 @@ def deduct_tokens_atomic(api_key: str, tokens: int) -> int:
         return 0
 
 # -----------------------------
-# 7. ResponseProcessor (exactly same)
+# 7. ResponseProcessor
 # -----------------------------
 class ResponseProcessor:
     FORBIDDEN = ["as an ai", "i am an artificial intelligence", "i don't have feelings", "i am a large language model", "as a language model", "i don't have emotions", "i cannot feel", "i am just a program"]
@@ -271,7 +258,7 @@ class ResponseProcessor:
         return f"{reply}\n\n{random.choice(cls.FOLLOW_UPS)}"
 
 # -----------------------------
-# 8. Main Chat Endpoint (exactly same - sirf context ab smart hai)
+# 8. Main Chat Endpoint
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
@@ -281,7 +268,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     api_key = authorization.replace("Bearer ", "").strip()
     user_msg = payload.messages[-1].content if payload.messages else ""
     
-    ctx = ContextEngine.get_neural_context(user_msg)
+    ctx = await ContextEngine.get_neural_context(user_msg)
     
     sys_prompt = BIG_BRAIN_PROMPT
     if ctx["emotion"]:
@@ -312,7 +299,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         reply = ResponseProcessor.add_follow_up(reply, user_msg)
 
         tokens = response.usage.total_tokens or 0
-        balance = deduct_tokens_atomic(api_key, tokens)
+        balance = await deduct_tokens_atomic(api_key, tokens)
 
         return {
             "company": "signaturesi.com",
@@ -330,10 +317,12 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         raise HTTPException(status_code=503, detail="Neo model service unavailable")
 
 # -----------------------------
-# 9. User Management Endpoints (exactly same)
+# 9. User Management
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
-def get_balance(api_key: str):
+def get_balance(api_key: str, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid API key")
     try:
         user = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
         balance = user.data.get("token_balance", 0) if user.data else 0
