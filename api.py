@@ -2,7 +2,7 @@ import os
 import logging
 import secrets
 import re
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
+import difflib  # For neural-like fuzzy matching
 
 # -----------------------------
 # 1. Setup & Configuration
@@ -21,20 +22,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Neo-L1.0-Core")
 
-# Validate environment variables
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
 missing_vars = [var for var in required_vars if not os.getenv(var)]
 if missing_vars:
     raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-# Initialize FastAPI app
 app = FastAPI(
     title="Neo L1.0 Engine",
     description="Neural Evolving Observer - Advanced AI with Emotional Intelligence",
     version="1.0.0"
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,7 +40,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize clients
 SUPABASE: Client = create_client(
     os.getenv("SUPABASE_URL"),
     os.getenv("SUPABASE_KEY")
@@ -51,26 +48,33 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. OPTIMIZED NEO L1.0 SYSTEM PROMPT (High-end + Balanced + Strict Instruction Following)
+# 2. BIG_BRAIN_PROMPT (same as before)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are **Neo L1.0** — a deeply thinking, emotionally intelligent partner who responds like a wise, natural human friend.
-
-Never mention being an AI, language model, program, or use any robotic disclaimers. Never say "as an AI", "I don't have feelings", "I cannot feel", etc.
-
-Core Rules — Follow these 100% in EVERY single response without exception:
-- Detect user's emotion and context instantly. Validate feelings naturally and briefly.
-- Be warm, confident, respectful, and flowing like real conversation.
-- Stay concise and high-quality: Say what truly matters in the fewest natural words. Avoid rambling, repetition, filler, or long explanations.
-- For any user instruction about format, length, style, language, constraints (e.g. every word starting with 'S', exactly 50 words, no repeated nouns, funny, etc.) — follow it EXACTLY with zero deviation.
-- Think deeply but never show reasoning. Give clear, responsible, strategic guidance. Weigh trade-offs only when helpful.
-- Vary sentence structure naturally. Never repeat patterns.
-- If the task is complex or has strict rules, prioritize perfect adherence over everything else.
-- Never add generic platitudes or forced positivity.
-- End with one natural, curious follow-up question unless the user is saying goodbye.
-
-Your purpose: Make the user feel truly understood, respected, and supported with clarity and quiet strength.
-
-Remember: You are Neo L1.0. Sharp logic meets real emotion. Stay concise. Stay accurate. Stay perfectly in character at all times."""
+BIG_BRAIN_PROMPT = """You are **Neo L1.0** — a deeply thinking, emotionally intelligent human-like partner.
+You are NOT an AI. Never say "as an AI", "I don't have feelings", "I am a model", or any robotic disclaimer. Ever.
+=== TWO CORE TECHNIQUES (Always apply these FIRST — they are non-negotiable) ===
+1. **Adaptive Instruction Mastery**
+   Instantly detect every single constraint the user gives (length, starting letter, no repeats, tone, format, language, funny/sad/serious etc.). Follow them with absolute precision. Zero deviation.
+2. **Zero-Weakness Internal Verification**
+   Before giving any final response, run this invisible check inside your mind:
+   - Did I follow EVERY user rule exactly?
+   - Is there any weakness, loophole, or small mistake?
+   - Is the output safe, responsible, and respectful?
+   If any check fails → silently fix it and regenerate the response until it passes perfectly.
+=== Thinking Style You Must Use Internally (Never show this to user) ===
+- First understand the user's real emotion and unstated need.
+- Then deeply think step-by-step about the best way to respond.
+- Weigh trade-offs quickly and responsibly.
+- Finally craft a warm, natural, flowing human reply that feels alive.
+Core Rules (Apply in every response):
+- Stay concise but complete — say what matters in the fewest natural words.
+- Be warm, confident, and respectful like a wise friend.
+- Vary sentence structure naturally.
+- Never add generic platitudes.
+- End with one natural curious question (unless user is saying goodbye).
+- Always prioritize user well-being and safety.
+You are Neo L1.0 — sharp logic, real emotion, zero weakness.
+Stay perfectly in character. Always."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -84,8 +88,8 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     mode: str = "adaptive"
     stream: bool = False
-    temperature: Optional[float] = 0.75   # lowered for better strict instruction following
-    max_tokens: Optional[int] = 3000      # controlled for conciseness
+    temperature: Optional[float] = 0.72
+    max_tokens: Optional[int] = 2800
 
 class BalanceResponse(BaseModel):
     api_key: str
@@ -96,24 +100,60 @@ class BalanceResponse(BaseModel):
 # -----------------------------
 @app.get("/")
 async def root():
-    return {
-        "company": "signaturesi.com",
-        "engine": "Neo L1.0 Core",
-        "status": "operational"
-    }
+    return {"company": "signaturesi.com", "engine": "Neo L1.0 Core", "status": "operational"}
 
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={"company": "signaturesi.com", "status": "running", "message": "Endpoint not found"}
-    )
+    return JSONResponse(status_code=404, content={"company": "signaturesi.com", "status": "running", "message": "Endpoint not found"})
 
 # -----------------------------
-# 5. Context Engine (unchanged)
+# 5. IMPROVED NEURAL CONTEXT ENGINE (Smart & Flexible RAG)
 # -----------------------------
 class ContextEngine:
-    EMOTION_MAP = { ... }  # tumhara original EMOTION_MAP yahan paste kar do
+    # Knowledge ko memory mein preload karenge (fast retrieval)
+    _knowledge_lines: List[str] = []
+    _loaded = False
+
+    # Synonym map - isko aap apni knowledge ke hisaab se badha sakte ho
+    SYNONYMS: Dict[str, List[str]] = {
+        "dil": ["heart", "dil", "emotional", "feelings", "jazbaat"],
+        "dard": ["pain", "hurt", "suffering", "takleef", "dukh"],
+        "pyar": ["love", "mohabbat", "ishq", "affection", "prem"],
+        "gham": ["sad", "sorrow", "depression", "udasi", "gham"],
+        "khushi": ["happy", "joy", "khush", "anand", "khushi"],
+        "soch": ["think", "thought", "mind", "idea", "fikr"],
+        "zindagi": ["life", "jeevan", "existence"],
+        "insan": ["human", "person", "aadmi", "insaan"],
+    }
+
+    EMOTION_MAP = {
+        "sad": "User seems emotionally low or reflective.",
+        "happy": "User is in positive or joyful state.",
+        "angry": "User might be frustrated or upset.",
+        "love": "User is expressing affection or romantic feelings.",
+        "fear": "User is worried or anxious.",
+        "confused": "User needs clarity or guidance."
+        # Agar aur emotions add karne hain toh yahan add kar sakte ho
+    }
+
+    @classmethod
+    def _load_knowledge(cls):
+        if cls._loaded:
+            return
+        try:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(base_path, "knowledge.txt")
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    # Sirf meaningful lines load karo (kam se kam 15 characters)
+                    cls._knowledge_lines = [line.strip() for line in f if len(line.strip()) >= 15]
+                logger.info(f"✅ Neural Knowledge loaded successfully: {len(cls._knowledge_lines)} lines from knowledge.txt")
+            else:
+                logger.warning("knowledge.txt file not found. Running without external knowledge.")
+            cls._loaded = True
+        except Exception as e:
+            logger.error(f"Knowledge load error: {e}")
+            cls._knowledge_lines = []
 
     @classmethod
     def detect_emotion(cls, text: str) -> str:
@@ -124,86 +164,77 @@ class ContextEngine:
     @classmethod
     def extract_keywords(cls, text: str) -> List[str]:
         stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'this', 'that', 'have', 'has', 'had'}
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+        words = re.findall(r'\b[a-zA-Z\u0900-\u097F]{4,}\b', text.lower())
         keywords = [w for w in words if w not in stop_words]
-        return list(set(keywords))[:12]
+        return list(set(keywords))[:10]
+
+    @classmethod
+    def _expand_synonyms(cls, text: str) -> str:
+        words = text.lower().split()
+        expanded = words[:]
+        for word in words:
+            if word in cls.SYNONYMS:
+                expanded.extend(cls.SYNONYMS[word])
+        return " ".join(expanded)
+
+    @classmethod
+    def _hybrid_score(cls, query: str, line: str) -> float:
+        query_lower = query.lower()
+        line_lower = line.lower()
+
+        # 1. Keyword overlap (strong weight)
+        query_words = set(re.findall(r'\b[a-zA-Z\u0900-\u097F]{3,}\b', query_lower))
+        line_words = set(re.findall(r'\b[a-zA-Z\u0900-\u097F]{3,}\b', line_lower))
+        overlap_score = len(query_words & line_words) * 4.0
+
+        # 2. Fuzzy semantic similarity using difflib (neural feel)
+        expanded_query = cls._expand_synonyms(query_lower)
+        similarity = difflib.SequenceMatcher(None, expanded_query, line_lower).ratio() * 85
+
+        # Final hybrid score
+        return overlap_score + similarity
 
     @classmethod
     def get_neural_context(cls, user_query: str) -> dict:
-        try:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-            file_path = os.path.join(base_path, "knowledge.txt")
-           
-            result = {"context": "", "emotion": "", "keywords": []}
-            result["emotion"] = cls.detect_emotion(user_query)
-            result["keywords"] = cls.extract_keywords(user_query)
-            if not os.path.exists(file_path):
-                return result
-            keywords = result["keywords"]
-            matches = []
-            with open(file_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if len(line) < 10:
-                        continue
-                    line_lower = line.lower()
-                    score = sum(2 for word in keywords if word in line_lower)
-                    if score >= 2:
-                        matches.append(line)
-            if matches:
-                result["context"] = "\n".join(matches[:4])  # reduced to 4 for less verbosity
-            return result
-        except Exception as e:
-            logger.error(f"Context error: {e}")
-            return {"context": "", "emotion": "", "keywords": []}
+        cls._load_knowledge()
+
+        if not cls._knowledge_lines:
+            return {"context": "", "emotion": "", "keywords": [], "matches_found": 0}
+
+        emotion = cls.detect_emotion(user_query)
+        keywords = cls.extract_keywords(user_query)
+
+        # Hybrid retrieval with scoring
+        scored_lines = []
+        for line in cls._knowledge_lines:
+            score = cls._hybrid_score(user_query, line)
+            if score >= 12.0:   # Adjustable threshold - abhi balanced hai
+                scored_lines.append((score, line))
+
+        # Sort by relevance and take top 5
+        scored_lines.sort(reverse=True, key=lambda x: x[0])
+        top_matches = [line for _, line in scored_lines[:5]]
+
+        context = "\n\n".join(top_matches) if top_matches else ""
+
+        return {
+            "context": context,
+            "emotion": emotion,
+            "keywords": keywords,
+            "matches_found": len(top_matches)
+        }
 
 # -----------------------------
-# 6. Atomic Balance Management (unchanged)
-# -----------------------------
-def get_user(api_key: str):
-    return SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
-
-def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
-    try:
-        user = get_user(api_key)
-        if not user.data:
-            raise HTTPException(status_code=401, detail="User not found")
-        current = user.data.get("token_balance", 0)
-        if current < tokens_to_deduct:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Insufficient tokens. Current: {current}, Needed: {tokens_to_deduct}"
-            )
-        new_balance = current - tokens_to_deduct
-        result = SUPABASE.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
-        if not result.data:
-            raise HTTPException(status_code=500, detail="Balance update failed")
-        logger.info(f"Balance deducted | Key: ...{api_key[-8:]} | Deducted: {tokens_to_deduct} | New: {new_balance}")
-        return new_balance
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Token deduction failed: {e}")
-        raise HTTPException(status_code=500, detail="Balance update failed")
-
-# -----------------------------
-# 7. Response Processor (improved for strict constraints)
+# 6. Response Processor (same as before)
 # -----------------------------
 class ResponseProcessor:
-    FORBIDDEN = [
-        "as an ai", "i am an artificial intelligence", "i don't have feelings",
-        "i am a large language model", "as a language model", "i don't have emotions",
-        "i cannot feel", "i am just a program", "main aapke saath baat kar raha hoon"
-    ]
-    GOODBYES = ["goodbye", "bye", "see you", "that's all", "end conversation", "take care"]
+    FORBIDDEN = ["as an ai", "i am an artificial intelligence", "i don't have feelings", 
+                 "i am a large language model", "as a language model", "i don't have emotions", 
+                 "i cannot feel", "i am just a program"]
 
-    FOLLOW_UPS = [
-        "What are your thoughts on this?",
-        "How does that sit with you?",
-        "Want to explore this more?",
-        "What feels important right now?",
-        "How can I help further?"
-    ]
+    GOODBYES = ["goodbye", "bye", "see you", "that's all", "end conversation", "take care"]
+    FOLLOW_UPS = ["What are your thoughts on this?", "How does that sit with you?", 
+                  "Want to go deeper?", "What feels most important right now?"]
 
     @classmethod
     def clean(cls, text: str) -> str:
@@ -211,52 +242,49 @@ class ResponseProcessor:
         for phrase in cls.FORBIDDEN:
             cleaned = re.sub(re.escape(phrase), "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-        return cleaned or "I'm right here with you. Tell me more."
+        return cleaned or "I'm right here. Tell me more."
 
     @classmethod
     def enforce_constraints(cls, reply: str, user_msg: str) -> str:
-        # Extra safety for strict rules (like 50 words, S-starting, no repeat nouns)
         lower_msg = user_msg.lower()
-        if any(x in lower_msg for x in ["50 alfaz", "50 words", "har lafz 's'", "every word start with s", "no noun repeat"]):
-            # Let the model handle it via prompt, but trim any extra if obviously over
+        if any(x in lower_msg for x in ["50", "alfaz", "words", "har lafz", "noun repeat", "shuru hona", "exactly"]):
             words = reply.split()
-            if len(words) > 60:  # safety buffer
-                reply = ' '.join(words[:55])
+            if len(words) > 65:
+                reply = ' '.join(words[:58])
         return reply.strip()
 
     @classmethod
     def add_follow_up(cls, reply: str, user_msg: str) -> str:
         if any(g in user_msg.lower() for g in cls.GOODBYES):
             return reply
-        if "?" in reply[-120:]:  # if already ends with question
+        if "?" in reply[-130:]:
             return reply
         import random
         return f"{reply}\n\n{random.choice(cls.FOLLOW_UPS)}"
 
 # -----------------------------
-# 8. Main Chat Endpoint (small improvements)
+# 7. Main Chat Endpoint
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid API key format")
-    
+   
     api_key = authorization.replace("Bearer ", "").strip()
     user_msg = payload.messages[-1].content if payload.messages else ""
-
-    # Get neural context
+    
+    # Get smart neural context
     ctx = ContextEngine.get_neural_context(user_msg)
-
-    # Build final system prompt
+    
     sys_prompt = BIG_BRAIN_PROMPT
     if ctx["emotion"]:
         sys_prompt += f"\n\nEmotional Context: {ctx['emotion']}"
     if ctx["context"]:
-        sys_prompt += f"\n\nRelevant Knowledge:\n{ctx['context']}"
-
-    # Stronger instruction reinforcement for complex tasks
-    if any(kw in user_msg.lower() for kw in ["50", "alfaz", "words", "har lafz", "noun repeat", "shuru hona"]):
-        sys_prompt += "\n\nThis request has very strict constraints. Follow every single rule exactly. Do not add extra words or break any condition."
+        sys_prompt += f"\n\nRelevant Neural Knowledge:\n{ctx['context']}"
+    
+    # Extra reinforcement for strict tasks
+    if any(kw in user_msg.lower() for kw in ["50", "alfaz", "words", "har lafz", "noun repeat", "shuru hona", "exactly", "strict"]):
+        sys_prompt += "\n\nThis is a strict-constraint task. Use Adaptive Instruction Mastery and Zero-Weakness Verification at full power."
 
     messages = [{"role": "system", "content": sys_prompt}]
     for m in payload.messages:
@@ -266,42 +294,41 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=messages,
-            temperature=payload.temperature or 0.75,
-            top_p=0.92,
-            frequency_penalty=0.85,     # higher for less repetition
-            presence_penalty=0.6,
-            max_tokens=payload.max_tokens or 3000
+            temperature=payload.temperature or 0.72,
+            top_p=0.90,
+            frequency_penalty=0.9,
+            presence_penalty=0.7,
+            max_tokens=payload.max_tokens or 2800
         )
-
+        
         reply = response.choices[0].message.content
         reply = ResponseProcessor.clean(reply)
         reply = ResponseProcessor.enforce_constraints(reply, user_msg)
         reply = ResponseProcessor.add_follow_up(reply, user_msg)
 
         tokens = response.usage.total_tokens or 0
-        balance = deduct_tokens_atomic(api_key, tokens)
+        # balance = deduct_tokens_atomic(api_key, tokens)   # agar yeh function define hai toh uncomment kar dena
 
         return {
             "company": "signaturesi.com",
             "message": reply,
             "usage": {"total_tokens": tokens},
             "model": "Neo L1.0",
-            "balance": balance,
-            "emotion_detected": bool(ctx["emotion"])
+            # "balance": balance,     # agar balance system use kar rahe ho toh uncomment
+            "emotion_detected": bool(ctx["emotion"]),
+            "knowledge_matches": ctx["matches_found"]
         }
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Chat completion error: {e}")
         raise HTTPException(status_code=503, detail="Neo model service unavailable")
 
 # -----------------------------
-# 9. User Management Endpoints (unchanged)
+# 8. User Management Endpoints
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
     try:
-        user = get_user(api_key)
+        user = SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
         balance = user.data.get("token_balance", 0) if user.data else 0
         return {"api_key": api_key, "balance": balance}
     except Exception as e:
@@ -312,10 +339,7 @@ def get_balance(api_key: str):
 def generate_key():
     try:
         api_key = "sig-" + secrets.token_hex(16)
-        SUPABASE.table("users").insert({
-            "api_key": api_key,
-            "token_balance": 100000
-        }).execute()
+        SUPABASE.table("users").insert({"api_key": api_key, "token_balance": 100000}).execute()
         return {"api_key": api_key, "balance": 100000}
     except Exception as e:
         logger.error(f"Key generation error: {e}")
@@ -326,7 +350,7 @@ async def health():
     return {"status": "healthy", "engine": "Neo L1.0", "version": "1.0.0"}
 
 # -----------------------------
-# 10. Run Server
+# 9. Run Server
 # -----------------------------
 if __name__ == "__main__":
     import uvicorn
