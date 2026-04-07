@@ -896,5 +896,7 @@ AGI-Level Math Reasoning Corpus – 2026
 - Focus is on reasoning over memorization.
 - Each section contains examples, patterns, and heuristics.
 - Corpus is **domain-agnostic**: model can generalize to new problems.
+[topic] 50 words story (internal use)
+Smart samosa seller suddenly spotted silly squirrel singing song, so stylish student started selfie session, shocking surrounding spectators since sneaky snake stole sandwich, slipping silently, scattering snacks, sparking strange situation, showing surprising scenes, spreading smiles, stirring soft snickers, supporting silly story, satisfying senses, stopping seriousness, saving शाम, super successful spectacle.
 
 
