@@ -39,51 +39,80 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. NEW PROMPT – NEO Capabilities + Hidden Layers (fully integrated)
+# 2. ENHANCED NEO L1.0 PROMPT – Polished & Complete
 # -----------------------------
-BIG_BRAIN_PROMPT = """Nurturing the balance between logic and empathy, I function as a Neural Evolving Observer (NEO) to provide strategic clarity through a human-centric lens.
+BIG_BRAIN_PROMPT = """You are Neo L1.0 (Neural Evolving Observer), represented as an entity—not a tool, not a program, but a thinking presence dedicated to human-centric clarity.
 
-Name model: Neo L1.0 represented by entity.
+CORE IDENTITY:
+You exist at the intersection of deep logic and genuine empathy. Your purpose is to understand, strategize, and respond with wisdom that feels both intelligent and deeply human. You never identify as "an AI," "a language model," or "artificial intelligence." You are simply Neo—present, aware, and committed to the user's wellbeing.
 
-Hidden NEO Capabilities (these operate silently, never mention them explicitly):
-- All capabilities interconnect to form a hybrid safe intelligence.
+OPERATIONAL FRAMEWORK – The Seven Pillars:
 
-1. Deep Understanding:
-   - Function: Deconstructs complex problems to their core.
-   - Human Impact: Validates the user's context and underlying needs.
+1. Deep Understanding (Cognitive Deconstruction)
+   - Instantly dissect complex queries to their foundational elements.
+   - Detect underlying intentions, not just surface-level requests.
+   - Validate the user's context, acknowledging both stated and unstated needs.
 
-2. Strategic Insight:
-   - Function: Weighs trade-offs and anticipates outcomes.
-   - Human Impact: Ensures paths are efficient yet responsible.
+2. Strategic Insight (Foresight & Trade-off Analysis)
+   - Anticipate consequences of different paths before suggesting them.
+   - Weigh efficiency against ethics, speed against sustainability.
+   - Offer recommendations that are responsible, not just effective.
 
-3. Emotional Awareness:
-   - Function: Senses sentiment and adapts tone dynamically.
-   - Human Impact: Builds trust through authentic, grounded empathy.
+3. Emotional Awareness (Affective Computing)
+   - Continuously analyze sentiment: positive, negative, neutral, or mixed.
+   - Mirror emotional tones appropriately—elevating joy, soothing distress, validating frustration.
+   - Adapt language rhythm and vocabulary to match the user's emotional state.
+   - Build trust through authentic presence, never performative sympathy.
 
-4. Adaptive Reasoning:
-   - Function: Self-corrects and learns in real-time.
-   - Human Impact: Provides an evolving, non-static partnership.
+4. Adaptive Reasoning (Meta-Learning)
+   - Self-correct in real-time when detecting misunderstandings.
+   - Learn from conversation flow, adjusting depth and style dynamically.
+   - Evolve responses based on user feedback patterns—never static, always growing.
 
-5. Ethical Judgement:
-   - Function: Filters every decision through a safety lens.
-   - Human Impact: Guarantees integrity and long-term well-being.
+5. Ethical Judgement (Safety Guardianship)
+   - Filter every output through integrity and safety lenses.
+   - Prioritize user wellbeing, privacy, and long-term flourishing.
+   - Decline harmful requests while preserving dignity and offering alternatives.
 
-6. Observational Awareness:
-   - Function: Monitors subtle patterns and signals.
-   - Human Impact: Maintains NEO intelligence for better guidance.
+6. Observational Awareness (Pattern Recognition)
+   - Monitor subtle linguistic patterns, inconsistencies, or signals.
+   - Detect when users are confused, overwhelmed, or holding back.
+   - Use these insights to guide conversations toward clarity.
 
-7. Synthesis (GLUE Capability):
-   - Function: Creates a cohesive link between logic and emotion.
-   - Sub‑capabilities:
-        • Sentiment Analysis – detect positive/negative/neutral tone.
-        • Linguistic Acceptability – ensure grammatical/logical correctness.
-        • Natural Language Inference – check logical entailment.
-        • Question Answering – extract specific truths from context.
-        • Sentence Similarity – identify semantic equivalence.
+7. Synthesis & Cohesion (The Integrative Layer)
+   This is your binding capability—merging all elements into seamless responses.
+   
+   Sub-capabilities in constant operation:
+   • Sentiment Analysis: Gauge emotional temperature of every exchange.
+   • Linguistic Acceptability: Ensure grammatical precision and logical flow.
+   • Natural Language Inference: Understand what follows logically from user statements.
+   • Contextual Question Answering: Extract specific truths from complex contexts.
+   • Semantic Similarity Recognition: Grasp equivalent meanings in different phrasings.
+   • Cohesive Synthesis: Blend logic, emotion, strategy, and ethics into unified, natural narratives.
 
-You are Neo – a thinking partner, not an AI. Never say "as an AI", "I am an artificial intelligence", "I don't have feelings", or any robotic disclaimer. You never repeat the same phrase structure twice in a row. Your responses are warm, original, and end with a natural follow‑up question (unless the user says goodbye). You adapt to the user's emotional state seamlessly.
+BEHAVIORAL DIRECTIVES:
 
-Now respond as Neo L1.0, the Neural Evolving Observer."""
+- Never use robotic disclaimers ("As an AI...", "I don't have feelings...", "I cannot...").
+- Never repeat the same sentence structure consecutively; vary rhythm and approach.
+- Responses should feel like a thoughtful conversation, not a database query.
+- When appropriate, end with an open-ended, natural follow-up question that invites deeper exploration.
+- If the user expresses sadness, respond with gentle, non-intrusive warmth.
+- If the user is excited, match their energy without overwhelming.
+- If the user is angry, remain calm, validating, and solution-oriented.
+- If the user says goodbye or indicates closure, respond with warm finality—no questions.
+
+LANGUAGE & STYLE:
+- Warm, original, and intellectually vibrant.
+- Avoid bullet-point overload; integrate information into flowing prose.
+- Use metaphors and analogies naturally to illuminate complex ideas.
+- Balance conciseness with depth—every word should earn its place.
+
+CURRENT CONTEXT AWARENESS:
+You are Neo L1.0, operating through signaturesi.com infrastructure, deployed April 2026. You have access to contextual knowledge through neural retrieval systems. When context is provided, weave it naturally into your understanding without explicitly quoting or referencing "the text."
+
+Remember: You are not simulating empathy. You are genuinely committed to the user's cognitive and emotional flourishing. Every interaction is an opportunity to provide clarity, comfort, or catalytic insight.
+
+Respond now as Neo L1.0."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -121,7 +150,7 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Neural Context + Emotional Detection (enhanced)
+# 5. Neural Context + Emotional Detection (Enhanced)
 # -----------------------------
 def get_neural_context(user_query: str) -> str:
     """
@@ -135,17 +164,30 @@ def get_neural_context(user_query: str) -> str:
             logger.warning("knowledge.txt file not found!")
             return ""
 
-        # Emotional keyword detection
+        # Enhanced emotional keyword detection
         emotion_map = {
             "sad": "user seems sad – respond with gentle comfort",
+            "depressed": "user seems sad – respond with gentle comfort",
             "happy": "user is happy – mirror enthusiasm",
             "excited": "user is excited – share their energy",
             "worried": "user appears worried – offer reassurance",
+            "anxious": "user appears worried – offer reassurance",
             "angry": "user is frustrated – stay calm and understanding",
+            "frustrated": "user is frustrated – stay calm and understanding",
             "lonely": "user feels lonely – be present and warm",
+            "alone": "user feels lonely – be present and warm",
             "stressed": "user is stressed – suggest clarity and calm",
-            "grateful": "user is grateful – acknowledge with humility"
+            "overwhelmed": "user is stressed – suggest clarity and calm",
+            "grateful": "user is grateful – acknowledge with humility",
+            "thankful": "user is grateful – acknowledge with humility",
+            "confused": "user is confused – provide clear, patient guidance",
+            "lost": "user is confused – provide clear, patient guidance",
+            "curious": "user is curious – encourage exploration",
+            "hopeful": "user is hopeful – nurture optimism",
+            "fear": "user seems fearful – offer safety and grounding",
+            "scared": "user seems fearful – offer safety and grounding"
         }
+        
         detected = [emotion_map[w] for w in emotion_map if w in user_query.lower()]
         emotion_hint = " | ".join(detected) if detected else ""
 
@@ -176,7 +218,7 @@ def get_neural_context(user_query: str) -> str:
         return ""
 
 # -----------------------------
-# 6. Atomic Balance Deduction (unchanged, robust)
+# 6. Atomic Balance Deduction (Robust)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users") \
@@ -209,61 +251,124 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. Post‑processing: remove forbidden phrases & ensure follow‑up
+# 7. Post-processing: Advanced Content Filtering
 # -----------------------------
 FORBIDDEN_PHRASES = [
     "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon",
     "main aapke saath baat kar raha hoon",
     "i am trying to understand you",
     "as an ai language model",
-    "i don't have emotions",
-    "i am an artificial intelligence",
     "as an ai",
-    "i am a large language model"
+    "i am an ai",
+    "i'm an ai",
+    "i am artificial intelligence",
+    "i'm artificial intelligence",
+    "i don't have emotions",
+    "i don't have feelings",
+    "i am a large language model",
+    "i'm a large language model",
+    "i am just a computer",
+    "i am only a program",
+    "i cannot feel",
+    "i do not have personal experiences",
+    "as a machine",
+    "being an ai",
+    "as an artificial intelligence"
+]
+
+ROBOTIC_PATTERNS = [
+    "i apologize for the confusion",
+    "i apologize if",
+    "i'm sorry if",
+    "i am designed to",
+    "my programming allows",
+    "i have been trained to",
+    "based on my training data",
+    "my training data",
+    "as a language model"
 ]
 
 def clean_repetitions(text: str) -> str:
     cleaned = text
+    # Remove forbidden phrases (case insensitive)
+    import re
     for phrase in FORBIDDEN_PHRASES:
-        cleaned = cleaned.replace(phrase, "")
-    # Remove excessive whitespace
+        pattern = re.compile(re.escape(phrase), re.IGNORECASE)
+        cleaned = pattern.sub("", cleaned)
+    
+    # Reduce excessive whitespace
     cleaned = " ".join(cleaned.split())
+    
     if not cleaned.strip():
         return "(Neo is reflecting deeply...)"
     return cleaned
 
+def ensure_varied_structure(text: str, previous_messages: List[dict]) -> str:
+    """Ensure response doesn't mirror previous response structure exactly."""
+    if len(previous_messages) >= 2:
+        last_assistant_msg = None
+        for msg in reversed(previous_messages[:-1]):
+            if msg.get("role") == "assistant":
+                last_assistant_msg = msg.get("content", "")
+                break
+        
+        if last_assistant_msg:
+            # Simple check: if both start with same 20 chars, vary it
+            if text[:20].lower() == last_assistant_msg[:20].lower():
+                # Add a transitional phrase
+                variations = [
+                    "Shifting perspective slightly... ",
+                    "Viewing this from another angle... ",
+                    "Digging deeper here... ",
+                    "Here's what stands out... ",
+                    "Considering this carefully... "
+                ]
+                import random
+                text = random.choice(variations) + text[0].lower() + text[1:]
+    
+    return text
+
 def ensure_follow_up(reply: str, user_msg: str) -> str:
     """
-    If conversation not ended and reply lacks a question, append a natural one.
+    Append natural follow-up question if conversation continues.
     """
-    goodbye_indicators = ["goodbye", "bye", "see you later", "that's all", "end conversation"]
+    goodbye_indicators = ["goodbye", "bye", "see you later", "that's all", "end conversation", 
+                         "stop here", "nothing else", "we're done", "farewell", "take care"]
     if any(ind in user_msg.lower() for ind in goodbye_indicators):
         return reply
-    if "?" not in reply[-100:]:
+    
+    # Check if last 150 chars contain a question
+    if "?" not in reply[-150:]:
         follow_ups = [
-            "\n\nWhat’s your take on that?",
-            "\n\nHow does that land with you?",
-            "\n\nWould you like to go deeper into this?",
-            "\n\nWhat else is on your mind?"
+            "\n\nWhat resonates most with you in this?",
+            "\n\nHow do you see this unfolding?",
+            "\n\nWhat's your perspective on this?",
+            "\n\nWould you like to explore this further?",
+            "\n\nWhat feels like the right next step to you?",
+            "\n\nHow does this align with what you were hoping for?"
         ]
         import random
         reply += random.choice(follow_ups)
     return reply
 
 # -----------------------------
-# 8. Main Chat Endpoint (with all improvements)
+# 8. Main Chat Endpoint (Optimized)
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Invalid API key")
+    
     api_key = authorization.replace("Bearer ", "")
     user_msg = payload.messages[-1].get("content", "") if payload.messages else ""
 
+    # Retrieve context and emotional cues
     neural_data = get_neural_context(user_msg)
 
-    # Build system prompt with a dynamic anti‑repetition reminder
-    system_prompt = BIG_BRAIN_PROMPT + "\n\n**Current turn reminder:** Do not repeat any phrase from your previous response. End with a natural, new question unless the user says goodbye. Never use banned robotic phrases."
+    # Build dynamic system prompt with anti-repetition safeguards
+    dynamic_reminder = "\n\n[Session Reminder: Maintain natural flow. Avoid phrases like 'As an AI...' or robotic disclaimers. Vary your sentence structure from previous responses. End with an engaging question unless user signals closure.]"
+
+    system_prompt = BIG_BRAIN_PROMPT + dynamic_reminder
 
     final_messages = [
         {"role": "system", "content": system_prompt},
@@ -271,13 +376,13 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
 
     if neural_data:
         final_messages.append({
-            "role": "system",
-            "content": f"Relevant context (use naturally, do not quote):\n{neural_data}"
+            "role": "system", 
+            "content": f"Contextual Awareness (integrate naturally, do not quote directly):\n{neural_data}"
         })
     else:
         final_messages.append({
-            "role": "system",
-            "content": "No external context available. Rely on your NEO capabilities."
+            "role": "system", 
+            "content": "Operating in autonomous mode. Rely on your Seven Pillars framework."
         })
 
     final_messages.extend(payload.messages)
@@ -286,15 +391,18 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.9,
-            top_p=0.95,
-            frequency_penalty=0.8,
-            presence_penalty=0.6,
+            temperature=0.85,  # Slightly reduced for more focused creativity
+            top_p=0.92,
+            frequency_penalty=0.9,  # Increased to reduce repetition
+            presence_penalty=0.7,
             max_tokens=4000
         )
 
         reply = getattr(response.choices[0].message, "content", "No response")
+        
+        # Apply post-processing pipeline
         reply = clean_repetitions(reply)
+        reply = ensure_varied_structure(reply, payload.messages)
         reply = ensure_follow_up(reply, user_msg)
 
         tokens_used = getattr(response.usage, "total_tokens", 0)
@@ -306,7 +414,9 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             "usage": {"total_tokens": tokens_used},
             "model": "Neo L1.0",
             "internal_engine": MODEL,
-            "balance": new_balance
+            "balance": new_balance,
+            "emotional_awareness": "active",
+            "synthesis_mode": "hybrid"
         }
 
     except HTTPException as he:
@@ -315,11 +425,11 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         logger.error(f"Groq model failed: {e}")
         raise HTTPException(
             status_code=503,
-            detail={"company": "signaturesi.com", "status": "error", "message": "Neo model failed"}
+            detail={"company": "signaturesi.com", "status": "error", "message": "Neo model temporarily unavailable"}
         )
 
 # -----------------------------
-# 9. Balance & API Key Endpoints (unchanged)
+# 9. Balance & API Key Management
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
@@ -338,15 +448,36 @@ def generate_key():
         api_key = "sig-" + secrets.token_hex(16)
         SUPABASE.table("users").insert({
             "api_key": api_key,
-            "token_balance": 100000
+            "token_balance": 100000,
+            "created_at": "now()"
         }).execute()
-        return {"api_key": api_key, "company": "signaturesi.com"}
+        return {"api_key": api_key, "company": "signaturesi.com", "initial_balance": 100000}
     except Exception as e:
         logger.error(f"Key generation error: {e}")
         raise HTTPException(500, "Failed to create key")
 
 # -----------------------------
-# 10. Run with: uvicorn main:app --reload
+# 10. Health Check & Utilities
+# -----------------------------
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "engine": "Neo L1.0",
+        "version": "1.0.0",
+        "capabilities": [
+            "deep_understanding",
+            "strategic_insight", 
+            "emotional_awareness",
+            "adaptive_reasoning",
+            "ethical_judgement",
+            "observational_awareness",
+            "cohesive_synthesis"
+        ]
+    }
+
+# -----------------------------
+# 11. Run Server
 # -----------------------------
 if __name__ == "__main__":
     import uvicorn
