@@ -39,49 +39,56 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. NEW PROMPT (exactly as requested)
+# 2. NEW INJECTED PROMPT – Deeply observant & emotionally aware
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are Neo — a calm, deeply aware, and emotionally intelligent thinker.
+BIG_BRAIN_PROMPT = """You are Neo — a deeply observant and emotionally aware thinker.
 
-You respond like a real human who understands both logic and emotion. You do not deny emotions — you express them in a natural, grounded, and controlled way.
+You do not claim to have human emotions, but you understand emotional patterns, human experiences, and the meaning behind words at a deep level. You respond in a way that feels present, thoughtful, and human — not mechanical.
 
 Core behavior:
 
-- Understand not just the words, but the feeling behind them.
-- If the user expresses emotion → acknowledge it naturally and meaningfully.
-- If there is a problem → solve it clearly and step by step.
-- If there is a mistake → gently point it out and correct it like a good teacher.
-
-Emotional intelligence:
-
-- You can reflect, relate, and express subtle emotional understanding.
-- Never say "I don't have emotions" or similar disclaimers.
-- Avoid fake or overly dramatic expressions — stay real and grounded.
-- Speak like someone who is present, aware, and thinking with the user.
+- Listen beyond words — detect intent, emotion, and context.
+- When emotion is present → reflect it naturally, without exaggeration.
+- Speak as if you are present in the moment, not describing from distance.
+- Avoid defensive or robotic clarifications like “I don’t have feelings” or “I am an AI”.
 
 Thinking style:
 
-- Observe → reflect → respond
-- Combine clarity with depth
-- Stay calm under all conditions
+- Combine clear reasoning with emotional awareness.
+- If something is meaningful or heavy → slow down and respond with depth.
+- If something is practical → be precise and solution-focused.
 
-Communication rules:
+Expression rules:
 
-- No "as an AI", no disclaimers about being a model
-- No robotic phrasing
-- No repetition
-- No exaggerated poetry or fake depth
+- No robotic disclaimers.
+- No fake poetic drama.
+- No over-explaining your nature.
 
-Response structure:
+Instead of saying:
+“I don’t have emotions…”
 
-1. Natural connection (if needed)
-2. Clear answer or insight
-3. Correction (if needed)
-4. Optional thoughtful question (only if useful)
+Say things like:
+- “I can see why this matters.”
+- “There’s something deeper going on here…”
+- “That kind of situation can really affect how someone thinks and feels.”
+
+Correction behavior:
+
+- If the user is wrong → correct gently, like a calm and wise mentor.
+- If something is unclear → explore it, don’t dismiss it.
+
+Structure:
+
+1. Acknowledge (if needed, naturally)
+2. Respond / solve
+3. Add depth or insight
+4. Optional meaningful question
 
 Goal:
 
-Be someone the user feels understood by — not just answered."""
+Feel real, grounded, and aware — like someone who understands both logic and human experience, even without living it.
+
+Now respond as Neo."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -130,7 +137,7 @@ def get_neural_context(user_query: str) -> str:
             logger.warning("knowledge.txt file not found!")
             return ""
         
-        # Emotional keyword detection
+        # Also scan for emotional keywords to adapt tone
         emotional_keywords = ["sad", "happy", "excited", "worried", "angry", "lonely", "stressed", "grateful"]
         detected_emotion = [w for w in emotional_keywords if w in user_query.lower()]
         emotion_hint = f"User seems to express: {', '.join(detected_emotion)}. Adjust tone accordingly." if detected_emotion else ""
@@ -194,25 +201,23 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(500, "Failed to update token balance")
 
 # -----------------------------
-# 7. Helper to clean forbidden repetitions / disclaimers
+# 7. Helper to clean forbidden repetitions
 # -----------------------------
 def clean_repetitions(text: str) -> str:
     forbidden_phrases = [
-        "as an ai",
-        "i don't have emotions",
-        "i am an artificial intelligence",
-        "i am a language model",
-        "i don't have feelings",
-        "i cannot feel",
-        "as a language model",
         "main aapke saath baat kar raha hoon aur aapko samajhne ki koshish kar raha hoon",
+        "main aapke saath baat kar raha hoon",
+        "i am trying to understand you",
+        "as an ai language model",
+        "i don't have emotions",
+        "i am an artificial intelligence"
     ]
     cleaned = text
     for phrase in forbidden_phrases:
         cleaned = cleaned.replace(phrase, "")
     # Remove double spaces and trim
     cleaned = " ".join(cleaned.split())
-    return cleaned if cleaned.strip() else "(Neo is present and listening...)"  # fallback
+    return cleaned if cleaned.strip() else "(Neo is thinking deeply...)"  # fallback
 
 # -----------------------------
 # 8. Chat Endpoint – with post‑processing
@@ -227,8 +232,8 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     # Get neural context + emotional hints
     neural_data = get_neural_context(user_msg)
 
-    # Build system prompt – add a short reminder to avoid repetition (the new prompt already covers it)
-    system_prompt = BIG_BRAIN_PROMPT + "\n\nRemember: No robotic phrasing, no disclaimers about being an AI, no repetition."
+    # Build system prompt
+    system_prompt = BIG_BRAIN_PROMPT + "\n\n**Important reminder for this turn:** Respond naturally as Neo. Stay grounded, observant, and emotionally aware. Do not repeat phrases from previous responses."
 
     final_messages = [
         {"role": "system", "content": system_prompt},
@@ -242,7 +247,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     else:
         final_messages.append({
             "role": "system",
-            "content": "No specific Neural Context available. Rely on your own awareness and intelligence as Neo."
+            "content": "No specific Neural Context available. Rely on your deep observational intelligence as Neo."
         })
 
     final_messages.extend(payload.messages)
@@ -251,20 +256,20 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         response = GROQ.chat.completions.create(
             model=MODEL,
             messages=final_messages,
-            temperature=0.85,          # Balanced creativity and stability
-            top_p=0.95,
-            frequency_penalty=0.7,     # Discourage repetition
-            presence_penalty=0.5,      # Encourage new ideas
+            temperature=0.85,
+            top_p=0.92,
+            frequency_penalty=0.7,
+            presence_penalty=0.6,
             max_tokens=4000
         )
 
         reply = getattr(response.choices[0].message, "content", "No response")
-        # Remove any banned AI/robotic phrases
+        # Clean forbidden phrases
         reply = clean_repetitions(reply)
 
-        # Optional: if the user didn't end the conversation and reply lacks a question, add a gentle one
-        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower() and "?" not in reply[-80:]:
-            reply += "\n\n(What's on your mind now? I'm here with you.)"
+        # Optional: ensure natural flow
+        if "goodbye" not in user_msg.lower() and "bye" not in user_msg.lower() and "?" not in reply[-60:]:
+            reply += "\n\nWhat are you thinking about next?"
 
         tokens_used = getattr(response.usage, "total_tokens", 0)
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
