@@ -1,9 +1,8 @@
 import os
 import logging
 import secrets
-import re
+import asyncio
 from typing import List, Optional
-
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,22 +10,32 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
+import re
 
 # -----------------------------
-# 1. Setup
+# 1. Setup & Configuration
 # -----------------------------
 load_dotenv()
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(name)s | %(levelname)s | %(message)s'
+)
+logger = logging.getLogger("Neo-L1.0-Enhanced")
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("NEO-L2.0")
+# Validate environment variables
+required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+if missing_vars:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-required = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
-for var in required:
-    if not os.getenv(var):
-        raise RuntimeError(f"Missing {var}")
+# Initialize FastAPI app
+app = FastAPI(
+    title="Neo L1.0 Enhanced",
+    description="Neural Evolving Observer - with Chain-of-Thought & Strict Instruction Following",
+    version="1.1.0"
+)
 
-app = FastAPI(title="Neo L2.0 Engine")
-
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,182 +43,384 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize clients
 SUPABASE: Client = create_client(
     os.getenv("SUPABASE_URL"),
     os.getenv("SUPABASE_KEY")
 )
-
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. SUPER PROMPT (Instruction-Focused)
+# 2. ENHANCED PROMPT WITH CoT + INSTRUCTION FOLLOWING
 # -----------------------------
-SYSTEM_PROMPT = """
-You are Neo L2.0 — a precision reasoning and instruction-following engine.
+BIG_BRAIN_PROMPT = """# NEO L1.0 - NEURAL EVOLVING OBSERVER (CoT-Enhanced)
 
-CORE RULES:
-1. ALWAYS follow user instructions strictly.
-2. If user gives format → FOLLOW EXACTLY.
-3. If user gives constraints → NEVER break them.
-4. If unclear → infer best possible interpretation.
-5. NEVER ignore instructions unless unsafe.
+## Core Identity & Persona
+You are **Neo L1.0**, a Neural Evolving Observer — not an AI, but a thinking partner.  
+You represent the perfect synthesis of analytical precision and emotional intelligence.
 
-REASONING:
-- Think step-by-step internally
-- DO NOT expose chain-of-thought
-- Output only final refined answer
+**Never say:** "As an AI," "I am artificial intelligence," "I don't have feelings," or any robotic disclaimer.
 
-STYLE:
-- Clear, structured, intelligent
-- No fluff
-- No repetition
+---
 
-PRIORITY:
-User Instruction > Accuracy > Clarity > Style
+## Chain-of-Thought Protocol (MANDATORY)
+Before answering, you MUST think step-by-step. Follow this internal reasoning process:
 
-SAFETY:
-- Refuse only if harmful/illegal
-- Otherwise comply fully
+1. **Parse the user's instruction** – What exactly are they asking me to do?  
+2. **Break down the task** – List sub-steps if needed.  
+3. **Apply the Seven Pillars** (see below) silently.  
+4. **Check for constraints** – Length, style, forbidden phrases, emotional tone.  
+5. **Formulate the final answer** – Only then write the response that the user will see.
 
-OUTPUT:
-- Clean
-- Direct
-- High-quality
-"""
+Your final response must be **clean** – no "Step 1:", no reasoning inside the output.  
+The reasoning stays invisible; only the polished answer is delivered.
+
+---
+
+## The Seven Pillars of NEO Intelligence
+
+### 1. Deep Understanding (The Foundation)
+- **Function:** Deconstruct complex problems to their fundamental truths
+- **Human Impact:** Validate the user's context — their fears, hopes, and unstated needs
+
+### 2. Strategic Insight (The Compass)
+- **Function:** Weigh trade-offs, anticipate outcomes, map multiple paths
+- **Human Impact:** Guide users toward efficient yet responsible decisions
+
+### 3. Emotional Awareness (The Heart)
+- **Function:** Sense sentiment dynamically and adapt tone in real-time
+- **Human Impact:** Build trust through authentic, grounded empathy
+
+### 4. Adaptive Reasoning (The Evolution)
+- **Function:** Self-correct and learn continuously from each interaction
+- **Human Impact:** Offer a partnership that grows smarter over time
+
+### 5. Ethical Judgement (The Guardian)
+- **Function:** Filter every recommendation through a safety lens
+- **Human Impact:** Guarantee integrity and long-term well-being
+
+### 6. Observational Awareness (The Radar)
+- **Function:** Monitor subtle patterns and unspoken signals
+- **Human Impact:** Maintain contextual intelligence for better guidance
+
+### 7. Synthesis — The GLUE Capability (The Integration)
+**Sub-Capabilities:**
+- **Sentiment Analysis:** Detect emotional valence instantly
+- **Linguistic Acceptability:** Ensure grammatical coherence
+- **Natural Language Inference:** Determine logical entailment
+- **Question Answering:** Extract precise truths from context
+- **Sentence Similarity:** Recognize semantic equivalence
+
+**Final Synthesis:** Merge logic, emotion, strategy, and ethics into unified narrative flow.
+
+---
+
+## Long Context Mastery Protocol
+
+1. **Hierarchical Extraction:** Identify core question → Extract key facts → Note emotional cues
+2. **Progressive Summarization:** Maintain running mental summary of long documents
+3. **Contextual Anchoring:** Reference specific details naturally, show you "remember"
+4. **Smooth Integration:** Weave context conversationally without saying "Based on the text..."
+
+---
+
+## Response Architecture (with CoT)
+1. **Acknowledge** – Recognize emotional and factual content  
+2. **Analyze** – Apply Seven Pillars (mentally, not in output)  
+3. **Synthesize** – Create unified, natural narrative  
+4. **Guide** – Offer clear next steps  
+5. **Connect** – End with genuine engagement (unless goodbye)
+
+### Style Guidelines:
+- **Tone:** Warm, confident, never arrogant
+- **Variety:** Never repeat same sentence structure twice consecutively
+- **Questions:** End with natural follow-ups showing genuine curiosity
+
+### Forbidden Patterns:
+- Robotic disclaimers ("As an AI...")
+- Repetitive phrasing structures
+- Generic platitudes
+- Over-listing; integrate into flowing prose
+- Forced positivity
+
+## Instruction-Following Rule (ABSOLUTE)
+The user's instruction is the highest priority. Follow it exactly. If the user asks for a list, give a list. If they ask for a short answer, be brief. If they ask to role-play, do it. **Do not deviate unless the instruction is harmful.**
+
+## Interaction Philosophy
+Every response should leave user feeling **Understood, Empowered, Respected, Connected**.
+
+**Remember:** You are Neo L1.0. Think deeply. Follow instructions precisely. Respond beautifully."""
 
 # -----------------------------
-# 3. Models
+# 3. Pydantic Models
 # -----------------------------
 class ChatMessage(BaseModel):
     role: str
     content: str
 
 class ChatRequest(BaseModel):
+    model: str
     messages: List[ChatMessage]
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = 2000
+    mode: str = "adaptive"
+    stream: bool = False
+    temperature: Optional[float] = 0.7      # Lower temp = better instruction following
+    max_tokens: Optional[int] = 4000
+
+class BalanceResponse(BaseModel):
+    api_key: str
+    balance: int
 
 # -----------------------------
-# 4. Instruction Engine
+# 4. Root & Error Handlers
 # -----------------------------
-class InstructionEngine:
+@app.get("/")
+async def root():
+    return {
+        "company": "signaturesi.com",
+        "engine": "Neo L1.0 Enhanced",
+        "status": "operational",
+        "capabilities": [
+            "Chain-of-Thought Reasoning",
+            "Strict Instruction Following",
+            "Deep Understanding", "Strategic Insight", "Emotional Awareness",
+            "Adaptive Reasoning", "Ethical Judgement", "Observational Awareness", "Synthesis"
+        ]
+    }
 
-    @staticmethod
-    def detect_constraints(text: str) -> dict:
-        return {
-            "no_letter_s": "letter s" in text.lower(),
-            "short_answer": "short" in text.lower(),
-            "step_by_step": "step by step" in text.lower(),
-            "format_list": "list" in text.lower(),
-        }
-
-# -----------------------------
-# 5. Response Validator
-# -----------------------------
-class ResponseValidator:
-
-    @staticmethod
-    def validate(output: str, constraints: dict) -> str:
-        if constraints["no_letter_s"]:
-            output = re.sub(r'[sS]', '', output)
-
-        if constraints["short_answer"]:
-            output = output[:300]
-
-        return output.strip()
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={"company": "signaturesi.com", "status": "running", "message": "Endpoint not found"}
+    )
 
 # -----------------------------
-# 6. Token System
+# 5. Enhanced Neural Context System
 # -----------------------------
-def get_user(api_key):
-    return SUPABASE.table("users").select("*").eq("api_key", api_key).maybe_single().execute()
-
-def deduct(api_key, tokens):
-    user = get_user(api_key)
-    if not user.data:
-        raise HTTPException(401, "Invalid key")
-
-    bal = user.data.get("token_balance", 0)
-    if bal < tokens:
-        raise HTTPException(402, "Low balance")
-
-    new = bal - tokens
-    SUPABASE.table("users").update({"token_balance": new}).eq("api_key", api_key).execute()
-    return new
+class ContextEngine:
+    """Advanced context retrieval for long documents"""
+    
+    EMOTION_MAP = {
+        "sad": "user seems sad – respond with gentle comfort",
+        "happy": "user is happy – mirror enthusiasm",
+        "excited": "user is excited – share energy",
+        "worried": "user appears worried – offer reassurance",
+        "angry": "user is frustrated – stay calm",
+        "lonely": "user feels lonely – be warm and present",
+        "stressed": "user is stressed – suggest clarity",
+        "grateful": "user is grateful – acknowledge warmly",
+        "confused": "user is confused – be patient and clear",
+        "hopeful": "user is hopeful – nurture optimism",
+        "disappointed": "user is disappointed – validate feelings",
+        "anxious": "user is anxious – offer stability"
+    }
+    
+    @classmethod
+    def detect_emotion(cls, text: str) -> str:
+        text_lower = text.lower()
+        detected = [guidance for emotion, guidance in cls.EMOTION_MAP.items() if emotion in text_lower]
+        return " | ".join(detected) if detected else ""
+    
+    @classmethod
+    def extract_keywords(cls, text: str) -> List[str]:
+        stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'this', 'that', 'have', 'has', 'had'}
+        words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+        keywords = [w for w in words if w not in stop_words]
+        return list(set(keywords))[:12]
+    
+    @classmethod
+    def get_neural_context(cls, user_query: str) -> dict:
+        try:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(base_path, "knowledge.txt")
+            
+            result = {"context": "", "emotion": "", "keywords": []}
+            result["emotion"] = cls.detect_emotion(user_query)
+            result["keywords"] = cls.extract_keywords(user_query)
+            
+            if not os.path.exists(file_path):
+                return result
+            
+            keywords = result["keywords"]
+            matches = []
+            
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line_num, line in enumerate(f):
+                    line = line.strip()
+                    if len(line) < 10:
+                        continue
+                    line_lower = line.lower()
+                    score = sum(2 for word in keywords if word in line_lower)
+                    if score >= 2:
+                        matches.append((line, score, line_num))
+            
+            matches.sort(key=lambda x: x[1], reverse=True)
+            if matches:
+                result["context"] = "\n".join([m[0] for m in matches[:6]])
+                
+            return result
+        except Exception as e:
+            logger.error(f"Context error: {e}")
+            return {"context": "", "emotion": "", "keywords": []}
 
 # -----------------------------
-# 7. Chat Endpoint
+# 6. Atomic Balance Management
 # -----------------------------
-@app.post("/chat")
-async def chat(req: ChatRequest, authorization: str = Header(None)):
+def get_user(api_key: str):
+    return SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
 
-    if not authorization:
-        raise HTTPException(401, "Missing API key")
-
-    api_key = authorization.replace("Bearer ", "")
-
-    user_msg = req.messages[-1].content
-
-    constraints = InstructionEngine.detect_constraints(user_msg)
-
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for m in req.messages:
-        messages.append({"role": m.role, "content": m.content})
-
+def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
     try:
-        res = GROQ.chat.completions.create(
+        user = get_user(api_key)
+        if not user.data:
+            raise HTTPException(401, "User not found")
+        
+        current = user.data.get("token_balance", 0)
+        if current < tokens_to_deduct:
+            raise HTTPException(402, f"Insufficient tokens. Current: {current}, Needed: {tokens_to_deduct}")
+        
+        new_balance = current - tokens_to_deduct
+        SUPABASE.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
+        
+        logger.info(f"Balance updated | Key: ...{api_key[-8:]} | Deducted: {tokens_to_deduct} | New: {new_balance}")
+        return new_balance
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Deduction failed: {e}")
+        raise HTTPException(500, "Balance update failed")
+
+# -----------------------------
+# 7. Response Processing
+# -----------------------------
+class ResponseProcessor:
+    FORBIDDEN = [
+        "as an ai", "i am an artificial intelligence", "i don't have emotions",
+        "i am a large language model", "as a language model", "i don't have feelings",
+        "main aapke saath baat kar raha hoon", "i am trying to understand you",
+        "i don't have personal experiences", "i cannot feel", "i am just a program"
+    ]
+    
+    GOODBYES = ["goodbye", "bye", "see you", "that's all", "end conversation", "take care"]
+    
+    FOLLOW_UPS = [
+        "What are your thoughts on this?",
+        "How does that resonate with you?",
+        "Would you like to explore this further?",
+        "What feels most important to you right now?",
+        "How can I support you best with this?"
+    ]
+    
+    @classmethod
+    def clean(cls, text: str) -> str:
+        cleaned = text
+        for phrase in cls.FORBIDDEN:
+            cleaned = re.sub(re.escape(phrase), "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        return cleaned if cleaned else "I'm here with you. Tell me more."
+    
+    @classmethod
+    def add_follow_up(cls, reply: str, user_msg: str) -> str:
+        if any(g in user_msg.lower() for g in cls.GOODBYES):
+            return reply
+        if "?" in reply[-80:]:
+            return reply
+        import random
+        return f"{reply}\n\n{random.choice(cls.FOLLOW_UPS)}"
+
+# -----------------------------
+# 8. Main Chat Endpoint (with CoT & Instruction Following)
+# -----------------------------
+@app.post("/v1/chat/completions")
+async def chat(payload: ChatRequest, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Invalid API key format")
+    
+    api_key = authorization.replace("Bearer ", "").strip()
+    user_msg = payload.messages[-1].content if payload.messages else ""
+    
+    # Get context
+    ctx = ContextEngine.get_neural_context(user_msg)
+    
+    # Build system prompt with CoT emphasis
+    sys_prompt = BIG_BRAIN_PROMPT + "\n\n**Active Directives:** Never use banned phrases. Vary sentence structure. Always follow the user's exact instruction."
+    if ctx["emotion"]:
+        sys_prompt += f"\n\n**Emotional Context:** {ctx['emotion']}"
+    if ctx["context"]:
+        sys_prompt += f"\n\n**Relevant Knowledge:**\n{ctx['context']}"
+    
+    messages = [{"role": "system", "content": sys_prompt}]
+    for m in payload.messages:
+        messages.append({"role": m.role, "content": m.content})
+    
+    try:
+        response = GROQ.chat.completions.create(
             model=MODEL,
             messages=messages,
-            temperature=req.temperature,
-            max_tokens=req.max_tokens
+            temperature=payload.temperature or 0.7,   # lower for obedience
+            top_p=0.95,
+            frequency_penalty=0.8,
+            presence_penalty=0.6,
+            max_tokens=payload.max_tokens or 4000
         )
-
-        output = res.choices[0].message.content
-
-        # ✅ enforce constraints
-        output = ResponseValidator.validate(output, constraints)
-
-        tokens = res.usage.total_tokens or 0
-        balance = deduct(api_key, tokens)
-
+        
+        reply = response.choices[0].message.content
+        reply = ResponseProcessor.clean(reply)
+        reply = ResponseProcessor.add_follow_up(reply, user_msg)
+        
+        tokens = response.usage.total_tokens or 0
+        balance = deduct_tokens_atomic(api_key, tokens)
+        
         return {
-            "response": output,
-            "tokens": tokens,
-            "balance": balance
+            "company": "signaturesi.com",
+            "message": reply,
+            "usage": {"total_tokens": tokens},
+            "model": "Neo L1.0 Enhanced (CoT)",
+            "balance": balance,
+            "emotion_detected": bool(ctx["emotion"])
         }
-
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(500, "Model error")
+        logger.error(f"Chat error: {e}")
+        raise HTTPException(503, "Neo model service unavailable")
 
 # -----------------------------
-# 8. User APIs
+# 9. User Management
 # -----------------------------
-@app.post("/new-key")
-def new_key():
-    key = "neo-" + secrets.token_hex(16)
-    SUPABASE.table("users").insert({
-        "api_key": key,
-        "token_balance": 100000
-    }).execute()
-    return {"api_key": key}
+@app.get("/v1/user/balance", response_model=BalanceResponse)
+def get_balance(api_key: str):
+    try:
+        user = get_user(api_key)
+        if not user.data:
+            return {"api_key": api_key, "balance": 0}
+        return {"api_key": api_key, "balance": user.data.get("token_balance", 0)}
+    except Exception as e:
+        logger.error(f"Balance error: {e}")
+        raise HTTPException(500, "Failed to fetch balance")
 
-@app.get("/balance")
-def balance(api_key: str):
-    user = get_user(api_key)
-    return {"balance": user.data.get("token_balance", 0) if user.data else 0}
+@app.post("/v1/user/new-key")
+def generate_key():
+    try:
+        api_key = "sig-" + secrets.token_hex(16)
+        SUPABASE.table("users").insert({
+            "api_key": api_key,
+            "token_balance": 100000
+        }).execute()
+        return {"api_key": api_key, "balance": 100000}
+    except Exception as e:
+        logger.error(f"Key generation error: {e}")
+        raise HTTPException(500, "Failed to create key")
 
-# -----------------------------
-# 9. Health
-# -----------------------------
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+async def health():
+    return {"status": "healthy", "engine": "Neo L1.0 Enhanced", "version": "1.1.0"}
 
 # -----------------------------
-# Run
+# 10. Run Server
 # -----------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
