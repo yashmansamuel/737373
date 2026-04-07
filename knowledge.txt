@@ -164,41 +164,23 @@ Assets:
 - Neuralink
 - Boring Company
 Net Worth Timeline (Approximate):
-January 2025:
-- Real Net Worth: $600B
-- Notes: Tesla and SpaceX stock rising, early 2025 valuation.
-February 2025:
-- Real Net Worth: $610B
-March 2025:
-- Real Net Worth: $620B
-April 2025:
-- Real Net Worth: $630B
-May 2025:
-- Real Net Worth: $645B
-June 2025:
-- Real Net Worth: $650B
-July 2025:
-- Real Net Worth: $660B
-August 2025:
-- Real Net Worth: $670B
-September 2025:
-- Real Net Worth: $680B
-October 2025:
-- Real Net Worth: $695B
-November 2025:
-- Real Net Worth: $710B
-December 2025:
-- Real Net Worth: $726B
-- Notes: End-of-year peak valuation.
-January 2026:
-- Real Net Worth: $740B
-February 2026:
-- Real Net Worth: $780B
-March 2026:
-- Real Net Worth: $841B
-- Notes: Latest verified peak as of March 2026.
+January 2025: $600B
+February 2025: $610B
+March 2025: $620B
+April 2025: $630B
+May 2025: $645B
+June 2025: $650B
+July 2025: $660B
+August 2025: $670B
+September 2025: $680B
+October 2025: $695B
+November 2025: $710B
+December 2025: $726B (end-of-year peak)
+January 2026: $740B
+February 2026: $780B
+March 2026: $841B (latest verified peak as of March 2026)
 Additional Notes:
-- Net worth is highly dependent on Tesla stock price and private company valuations (SpaceX, Neuralink, Boring Company).
+- Net worth is highly dependent on Tesla stock price and private company valuations.
 - Daily fluctuations occur; these are approximate verified monthly figures.
 
 # ============================================================
@@ -360,364 +342,261 @@ Avoid robotic disclaimers; output human‑like adaptive reasoning.
 Compress large topics into high‑density, high‑entropy responses.
 Respect the user query context strictly and integrate relevant lines only.
 
-[topic] Real-World Clinical Facts –(internal use)
-Sources:
-- ADA 2026 Guidelines
-- AHA/ACC 2025/26 Guidelines
-- WHO Latest Updates
+# ============================================================
+# [topic] Real-World Clinical Facts –(internal use)
+# ============================================================
+Sources: ADA 2026 Guidelines, AHA/ACC 2025/26 Guidelines, WHO Latest Updates
 
 1. Cardiovascular (High BP & Heart Risk)
----------------------------------------
 - Hypertension Definition: Stage 1 Hypertension starts at ≥130/80 mmHg. If lifestyle modification for 3-6 months fails, start medication.
 - Single-Pill Combination (SPC): Preferred over single drug in new patients to achieve faster BP control.
 - Dementia Risk: High BP linked to cognitive decline; target SBP <130 mmHg for brain protection.
 - New Risk Calculator: PREVENT™ equations now preferred over ASCVD for 10-year heart risk estimation.
 
 2. Diabetes Mellitus (Sugar Management)
----------------------------------------
 - Weight Management First: Focus on 5–7% weight loss alongside glucose control.
 - GLP-1 & SGLT2: Mandatory for patients with cardiac or renal comorbidities, can be used with or before Metformin.
 - Continuous Glucose Monitoring (CGM): Early use recommended for Type 1 and Type 2 diabetes.
 - Liver Health: MASLD (fatty liver) incorporated into diabetes treatment algorithm.
 
 3. Tuberculosis (TB)
---------------------
 - 4-Month Course: Non-severe TB can be treated with 4-month Rifapentine-Moxifloxacin regimen.
 - Drug-Resistant TB (BPaLM): MDR-TB can be treated with 6-month all-oral regimen (Bedaquiline, Pretomanid, Linezolid, Moxifloxacin).
 
 4. Oncology & AI Innovations
------------------------------
 - Early Detection: AI tools (e.g., ECG GPT) improve early detection of heart failure and cancer by 20–35%.
 - Precision Medicine: Cancer treatment shifting from chemotherapy-only to targeted therapy based on genetic profiling.
 
 Summary Chart of Key Clinical Changes
--------------------------------------
 | Condition        | Old Fact (2014–2020)       | New Real-World Fact (2026)                    |
-|-----------------|---------------------------|-----------------------------------------------|
 | High BP         | Starts at 140/90          | Starts at 130/80                              |
 | Diabetes        | Glucose-centric           | Comorbidity-centric (Heart/Kidney/Weight)    |
 | MDR-TB          | 18–24 months treatment    | 6 months all-oral (BPaLM)                    |
 | Technology      | Prick tests               | CGM (Continuous Monitoring) early on         |
 
-Additional Notes:
-- Net clinical outcomes improve with early adoption of guideline-based interventions.
-- Real-world implementation requires monitoring and patient-specific adjustments.
-- These facts are verified for direct use in patient management.
+Additional Notes: Net clinical outcomes improve with early adoption of guideline-based interventions. Real-world implementation requires monitoring and patient-specific adjustments. These facts are verified for direct use in patient management.
 
-References:
-[1] https://www.ahajournals.org/doi/10.1161/CIR.0000000000001423
-[2] https://www.guidelinecentral.com/insights/aug-2025-accaha-bp-guideline-video/
-[3] https://www.acc.org/about-acc/press-releases/2025/08/13/20/03/new-high-blood-pressure-guideline-emphasizes-prevention-early-treatment-to-reduce-cvd-risk
-[4] https://www.ahajournals.org/doi/10.1161/HYP.0000000000000249
-[5] https://www.acc.org/latest-in-cardiology/journal-scans/2025/08/14/15/36/new-acc-aha-guideline-addresses-prevention-detection-evaluation-and-management-of-hbp
-[6] https://pmc.ncbi.nlm.nih.gov/articles/PMC12690167/
-[7] https://diabetesjournals.org/care/article/49/Supplement_1/S6/163930/Summary-of-Revisions-Standards-of-Care-in-Diabetes
-[8] https://diabetes.org/newsroom/press-releases/american-diabetes-association-releases-standards-care-diabetes-2026
-[9] https://www.linkedin.com/pulse/key-2026-ada-guideline-updates-matter-most-modern-care-tashko-md-mgnbe
-[10] https://diabetesonthenet.com/diabetes-primary-care/factsheet-2026-ada-standards/
-[11] https://diatribe.org/diabetes-management/your-guide-2026-ada-standards-care
-[12] https://www.cdc.gov/tb/php/dear-colleague-letters/2025-treatment-guidelines.html
-[13] https://www.ncbi.nlm.nih.gov/books/NBK613101/
-[14] https://journals.lww.com/aptm/fulltext/2024/17080/bpal_bpalm_regimen__a_bright_future_for.2.aspx
-[15] https://www.researchgate.net/publication/396137252_Clinical_Applications_and_Real-World_Impact
-[16] https://www.youtube.com/watch?v=FqsvgFTQv8w
-[17] https://pmc.ncbi.nlm.nih.gov/articles/PMC9557803/
-Sources:
-- ADA 2026 Standards of Care
-- AHA/ACC 2025/26 Guidelines
-- WHO Latest Updates
-- FDA 2026 Health Technology Guidance
+References: [1] https://www.ahajournals.org/doi/10.1161/CIR.0000000000001423 [2] https://www.guidelinecentral.com/insights/aug-2025-accaha-bp-guideline-video/ [3] https://www.acc.org/about-acc/press-releases/2025/08/13/20/03/new-high-blood-pressure-guideline-emphasizes-prevention-early-treatment-to-reduce-cvd-risk [4] https://www.ahajournals.org/doi/10.1161/HYP.0000000000000249 [5] https://www.acc.org/latest-in-cardiology/journal-scans/2025/08/14/15/36/new-acc-aha-guideline-addresses-prevention-detection-evaluation-and-management-of-hbp [6] https://pmc.ncbi.nlm.nih.gov/articles/PMC12690167/ [7] https://diabetesjournals.org/care/article/49/Supplement_1/S6/163930/Summary-of-Revisions-Standards-of-Care-in-Diabetes [8] https://diabetes.org/newsroom/press-releases/american-diabetes-association-releases-standards-care-diabetes-2026 [9] https://www.linkedin.com/pulse/key-2026-ada-guideline-updates-matter-most-modern-care-tashko-md-mgnbe [10] https://diabetesonthenet.com/diabetes-primary-care/factsheet-2026-ada-standards/ [11] https://diatribe.org/diabetes-management/your-guide-2026-ada-standards-care [12] https://www.cdc.gov/tb/php/dear-colleague-letters/2025-treatment-guidelines.html [13] https://www.ncbi.nlm.nih.gov/books/NBK613101/ [14] https://journals.lww.com/aptm/fulltext/2024/17080/bpal_bpalm_regimen__a_bright_future_for.2.aspx [15] https://www.researchgate.net/publication/396137252_Clinical_Applications_and_Real-World_Impact [16] https://www.youtube.com/watch?v=FqsvgFTQv8w [17] https://pmc.ncbi.nlm.nih.gov/articles/PMC9557803/
+
+# ============================================================
+# [topic] Real-World Clinical Facts (Second Set) –(internal use)
+# ============================================================
+Sources: ADA 2026 Standards of Care, AHA/ACC 2025/26 Guidelines, WHO Latest Updates, FDA 2026 Health Technology Guidance
 
 1. Cardiovascular & Lipids
----------------------------
 - LDL-C Goal Enhancement: Very High Risk patients now target LDL-C <55 mg/dL (previously 70 mg/dL). [AHA/ACC 2026]
 - Lipoprotein(a) Screening: All adults should have at least one lifetime Lp(a) test (Class 1 Recommendation).
 - LDL Calculation: Prefer Martin/Hopkins or Sampson/NIH equations over Friedewald formula for accuracy.
 - Resistant Hypertension: Screen for Primary Aldosteronism in uncontrolled BP, even with normal potassium levels.
 
 2. Diabetes Management (ADA 2026)
-----------------------------------
 - Continuous Glucose Monitoring (CGM): Recommended at diabetes onset for all patients, regardless of insulin therapy.
 - Blood Pressure Target: <120/80 mmHg in diabetic patients with hypertension to protect kidney and heart.
 - Predictive AI: Detects Type 1 diabetes risk 1 year prior to onset, preventing life-threatening DKA.
 - Obesity Focus: Emphasize 10–15% weight loss for diabetes remission over glucose-only control.
 
 3. Tuberculosis & Infectious Disease
--------------------------------------
 - TB remains a leading infectious killer worldwide; diabetes increases risk.
 - BPaLM Regimen: 6-month all-oral therapy for drug-resistant TB is now standard (previously 18 months).
 
 4. Health Technology (FDA 2026)
---------------------------------
 - Clinical Decision Support (CDS): Software can source data from approved guidelines; physician retains independent decision-making.
 - Wearable BP/Glucose Tech: FDA supports non-invasive wearables for wellness monitoring; not for direct clinical diagnosis.
 
 Summary Chart – Key Real-Time Clinical Updates
------------------------------------------------
 | Update                  | Previous Protocol          | 2026 Real-Time Fact                            |
-|-------------------------|--------------------------|-----------------------------------------------|
 | LDL Target              | <70 mg/dL                | <55 mg/dL (Very High Risk)                     |
 | BP in Diabetes          | <130/80                  | <120/80 (organ protection)                     |
 | TB Treatment            | 18–24 months (MDR)       | 6 months BPaLM (all-oral)                      |
 | CGM Use                 | Insulin users only       | All patients at diagnosis                       |
 
-Notes:
-- These updates are verified for use in **real-world patient management**.
-- Daily clinical application should follow patient-specific assessment and local regulations.
+Notes: These updates are verified for use in real-world patient management. Daily clinical application should follow patient-specific assessment and local regulations.
 
-References:
-[1] https://www.ahajournals.org/doi/10.1161/CIR.0000000000001423
-[2] https://www.youtube.com/watch?v=Hy9PlK8Pqdo&t=282
-[3] https://reference.medscape.com/cc2/p10/standards-care-type-2-diabetes-part-3-summary-guideline-2025a1000oh7
-[4] https://www.nkchealth.org/blog/diabetes-management-tech-watch-2026
-[5] https://www.adcesconnect.org/oklahomacoordinatingbody/blogs/kacy-aderhold/2026/01/02/2026-ada-standards-of-care-weight-reduction-goals
-[6] https://www.who.int/news-room/fact-sheets/detail/tuberculosis
-[7] https://about.citiprogram.org/blog/clinical-decision-support-compliance-fdas-2026-expectations/
-[8] https://www.faegredrinker.com/en/insights/publications/2026/1/key-updates-in-fdas-2026-general-wellness-and-clinical-decision-support-software-guidance
-[9] https://www.arnoldporter.com/en/perspectives/advisories/2026/01/fda-cuts-red-tape-on-clinical-decision-support-software
-Clinical Reasoning & Critical Thinking – 2026
-----------------------------------------------
+References: [1] https://www.ahajournals.org/doi/10.1161/CIR.0000000000001423 [2] https://www.youtube.com/watch?v=Hy9PlK8Pqdo&t=282 [3] https://reference.medscape.com/cc2/p10/standards-care-type-2-diabetes-part-3-summary-guideline-2025a1000oh7 [4] https://www.nkchealth.org/blog/diabetes-management-tech-watch-2026 [5] https://www.adcesconnect.org/oklahomacoordinatingbody/blogs/kacy-aderhold/2026/01/02/2026-ada-standards-of-care-weight-reduction-goals [6] https://www.who.int/news-room/fact-sheets/detail/tuberculosis [7] https://about.citiprogram.org/blog/clinical-decision-support-compliance-fdas-2026-expectations/ [8] https://www.faegredrinker.com/en/insights/publications/2026/1/key-updates-in-fdas-2026-general-wellness-and-clinical-decision-support-software-guidance [9] https://www.arnoldporter.com/en/perspectives/advisories/2026/01/fda-cuts-red-tape-on-clinical-decision-support-software
 
-Sources:
-- Real-world clinical practice principles
-- Evidence-based medical reasoning
-- Cognitive psychology in medicine
+# ============================================================
+# [topic] Clinical Reasoning & Critical Thinking – 2026 (First)
+# ============================================================
+Sources: Real-world clinical practice principles, Evidence-based medical reasoning, Cognitive psychology in medicine
 
 1. The 80/20 Rule in Diagnosis (Pareto Principle)
--------------------------------------------------
 - 80% of diagnoses come from patient history alone.
 - 10–15% require physical examination.
 - Remaining 5% need expensive tests (CT, MRI, labs).
 - Critical thinking prevents "over-testing" and emphasizes attentive listening.
 
 2. Bayesian Reasoning (Probability-Based Thinking)
---------------------------------------------------
 - Doctors think in probabilities, not just Yes/No.
 - Pre-test Probability: Assess disease likelihood before testing.
 - Positive test ≠ definite disease; consider false positives.
 - Real-world application reduces unnecessary interventions.
 
 3. Avoiding Cognitive Biases
-----------------------------
 - Anchoring Bias: Over-reliance on first information (e.g., chest burn → assume acidity, ignore heart attack).
 - Premature Closure: Confirming diagnosis too early without considering differential diagnosis.
 - Awareness of biases prevents medical errors.
 
 4. “Zebra” vs. “Horse” (Occam’s Razor)
----------------------------------------
 - Common symptoms often indicate common diseases (Flu, Infection), not rare conditions.
 - Critical thinkers rule out common conditions first.
 - Rare diagnoses are considered only when common causes are excluded.
 
 5. Sunk Cost Fallacy in Treatment
----------------------------------
 - Do not continue ineffective treatments just because resources are already spent.
 - Critical thinkers pivot based on new patient data.
 
 6. System 1 vs. System 2 Thinking
----------------------------------
 - System 1 (Fast/Intuitive): Used in ER/emergencies (e.g., CPR initiation). Based on experience.
 - System 2 (Slow/Analytical): Complex cases analyzed with detailed reports and tests.
 - Effective clinicians switch between both systems as needed.
 
 Summary – Clinical Thinking Process
-----------------------------------
 1. Observation: Patient behavior, speech, gait.
 2. Hypothesis: List 3–4 possible diagnoses.
 3. Deduction: Rule out possibilities via tests.
 4. Verification: Assess improvement with treatment; adjust as needed.
 
-Application:
-- Can be applied to chest pain, headache, shortness of breath, and other real-world patient cases.
-- Emphasizes reasoning over rote memorization.
-Clinical Reasoning & Critical Thinking – Real-World Practice (2025-26)
----------------------------------------------------------------------
+Application: Can be applied to chest pain, headache, shortness of breath, and other real-world patient cases. Emphasizes reasoning over rote memorization.
 
-Sources:
-- Modern clinical teaching protocols (2025-26)
-- Decision Science in medicine
-- Evidence-based practice & AI-assisted reasoning
+# ============================================================
+# [topic] Clinical Reasoning & Critical Thinking – Real-World Practice (2025-26) (Second)
+# ============================================================
+Sources: Modern clinical teaching protocols (2025-26), Decision Science in medicine, Evidence-based practice & AI-assisted reasoning
 
 1. The "Think Aloud" Protocol
------------------------------
 - Metacognition (thinking about thinking) is essential.
-- Senior doctors verbalize their thought process to trainees:
-    e.g., "I suspect cardiac failure because JVP is raised."
+- Senior doctors verbalize their thought process to trainees: e.g., "I suspect cardiac failure because JVP is raised."
 - Fact: Transparency in reasoning reduces medical errors by up to 30%.
 - Term: Clinical Reasoning Transparency
 
 2. Dual Process Theory (System 1 vs. System 2)
-----------------------------------------------
-- System 1 (Intuitive / Pattern Recognition):
-    - Fast, recognizes diseases quickly (e.g., Parkinson’s via observed patterns)
-    - Risk: Cognitive biases
-- System 2 (Analytical / Slow Thinking):
-    - Logical analysis of tests and symptoms for complex cases
-- Real-world fact: 75% diagnostic errors occur when System 1 is over-relied upon and System 2 is underused
+- System 1 (Intuitive / Pattern Recognition): Fast, recognizes diseases quickly (e.g., Parkinson’s via observed patterns). Risk: Cognitive biases.
+- System 2 (Analytical / Slow Thinking): Logical analysis of tests and symptoms for complex cases.
+- Real-world fact: 75% diagnostic errors occur when System 1 is over-relied upon and System 2 is underused.
 
 3. De-biasing Techniques (Checklists)
---------------------------------------
-- Use checklists similar to aviation industry to avoid errors
-- AI Integration: Human-in-the-loop reasoning
-    - Doctors critically appraise AI-suggested diagnoses instead of blindly following
-    - Ensures AI-assisted decisions are verified
+- Use checklists similar to aviation industry to avoid errors.
+- AI Integration: Human-in-the-loop reasoning. Doctors critically appraise AI-suggested diagnoses instead of blindly following. Ensures AI-assisted decisions are verified.
 
 4. Semantic Qualitative Drive (Data Synthesis)
------------------------------------------------
-- Symptoms are transformed into semantic qualifiers for better reasoning
-    - Old: "Fever for 3 days"
-    - New: "Acute, constant, high-grade febrile illness"
-- Fact: Categorizing symptoms guides clinicians toward correct differential diagnosis automatically
+- Symptoms are transformed into semantic qualifiers for better reasoning.
+  - Old: "Fever for 3 days"
+  - New: "Acute, constant, high-grade febrile illness"
+- Fact: Categorizing symptoms guides clinicians toward correct differential diagnosis automatically.
 
 5. Probability vs. Certainty (Bayesian Logic)
-----------------------------------------------
-- Medical decisions are based on probabilities, not 100% certainty
-- Pre-test probability assessment prevents unnecessary tests
-    - Example: 20-year-old with mild chest pain has low probability of heart attack → avoid Troponin test to reduce false positives
+- Medical decisions are based on probabilities, not 100% certainty.
+- Pre-test probability assessment prevents unnecessary tests.
+  - Example: 20-year-old with mild chest pain has low probability of heart attack → avoid Troponin test to reduce false positives.
 
 6. Premature Closure (The Number 1 Killer)
--------------------------------------------
-- Danger: Accepting first diagnosis without considering alternatives
-- Modern practice: "Diagnostic Time-outs"
-    - Teams pause to ask: "What else could this be?"
-    - Encourages exploration of differential diagnosis
+- Danger: Accepting first diagnosis without considering alternatives.
+- Modern practice: "Diagnostic Time-outs" – Teams pause to ask: "What else could this be?" Encourages exploration of differential diagnosis.
 
 Summary Table – Core Reasoning Skills
--------------------------------------
 | Concept            | Definition                   | Real-world Application                                 |
-|-------------------|-----------------------------|--------------------------------------------------------|
 | Metacognition      | Thinking about thinking     | Review reasoning to identify errors                    |
 | Cognitive Bias     | Mental shortcuts            | Avoid anchoring to first symptom                       |
 | Differential Diagnosis | List of possibilities    | Keep at least 3 options open                            |
 | Evidence-based     | Using latest data           | Update treatment if new research emerges               |
 
-Notes:
-- This feed emphasizes **real-world clinical decision-making** over textbook knowledge.
-- Safe, clean, and structured for direct ingestion into **RAG models or clinical AI systems**.
-- Focuses on **decision science, probability, transparency, and error prevention**.
-Clinical Reasoning & Critical Thinking – 2025-26
-------------------------------------------------
+Notes: This feed emphasizes real-world clinical decision-making over textbook knowledge. Safe, clean, and structured for direct ingestion into RAG models or clinical AI systems. Focuses on decision science, probability, transparency, and error prevention.
 
-Sources:
-- Real-world clinical practice observations
-- Decision Science applied in medicine
-- Cognitive psychology in clinical settings
+# ============================================================
+# [topic] Clinical Reasoning & Critical Thinking – 2025-26 (Third)
+# ============================================================
+Sources: Real-world clinical practice observations, Decision Science applied in medicine, Cognitive psychology in clinical settings
 
 1. The "Think Aloud" Protocol
------------------------------
 - Metacognition is essential in modern clinical teaching.
 - Senior doctors verbalize their thought process to trainees.
 - Fact: Transparency in reasoning reduces medical errors by up to 30%.
 - Term: Clinical Reasoning Transparency.
 
 2. Dual Process Theory (System 1 vs. System 2)
------------------------------------------------
 - System 1 (Intuitive): Fast pattern recognition; high risk of bias.
 - System 2 (Analytical): Slow, logical analysis of symptoms and tests.
 - Fact: 75% of diagnostic errors occur when System 1 is over-relied on without System 2 activation.
 
 3. De-biasing Techniques (Checklists)
---------------------------------------
 - Critical thinkers use structured checklists to avoid cognitive errors.
 - Fact: With AI support, doctors critically appraise AI suggestions—Human-in-the-loop reasoning.
 
 4. Semantic Qualitative Drive (Data Synthesis)
------------------------------------------------
 - Transform raw patient symptoms into semantic qualifiers.
 - Example: "Fever for 3 days" → "Acute, constant, high-grade febrile illness."
 - Fact: Categorizing symptoms improves differential diagnosis accuracy.
 
 5. Probability vs. Certainty (Bayesian Logic)
-----------------------------------------------
 - Medical decisions are probabilistic, not 100% certain.
 - Fact: Pre-test probability guides testing decisions; avoids unnecessary false positives.
 
 6. Premature Closure (The Number 1 Killer)
--------------------------------------------
 - Avoid locking onto the first diagnosis too soon.
 - Modern hospitals use "Diagnostic Time-outs" to reassess alternative possibilities.
 
 Summary Table – Key Reasoning Skills
-------------------------------------
 | Concept               | Definition                   | Real-world Application                         |
-|-----------------------|-----------------------------|-----------------------------------------------|
 | Metacognition         | Thinking about thinking      | Reviewing reasoning and learning from errors |
 | Cognitive Bias        | Mental shortcuts             | Avoid anchoring on first symptom             |
 | Differential Diagnosis | List of possible conditions | Keep at least 3 options open                 |
 | Evidence-based        | Using latest verified data   | Adapt reasoning if new evidence emerges      |
 
-Notes:
-- Focus is on reasoning process, not treatments or medications.
-- Applicable across all patient presentations and medical specialties.
-- Designed for learning, AI knowledge feed, and clinical decision training.
+Notes: Focus is on reasoning process, not treatments or medications. Applicable across all patient presentations and medical specialties. Designed for learning, AI knowledge feed, and clinical decision training.
 
-AGI-Level Reasoning & General Excellence – 2026
------------------------------------------------
-
-Sources:
-- Decision Science
-- Cognitive Psychology
-- Learning & Problem-Solving Research
-- AI Alignment & Meta-Learning Principles
+# ============================================================
+# [topic] AGI-Level Reasoning & General Excellence – 2026
+# ============================================================
+Sources: Decision Science, Cognitive Psychology, Learning & Problem-Solving Research, AI Alignment & Meta-Learning Principles
 
 1. Core Cognitive Skills
-------------------------
 - Observation: Carefully notice details before jumping to conclusions.
 - Pattern Recognition: Identify repeated structures or trends in data.
 - Abstraction: Generalize from specifics to principles; avoid overfitting to one example.
 - Critical Thinking: Question assumptions; evaluate evidence; avoid cognitive biases.
 
 2. Decision Science Principles
-------------------------------
 - Probability over Certainty: Always assess likelihoods, not absolutes.
 - Cost-Benefit Analysis: Consider resources, time, and consequences before choosing actions.
 - Trade-Off Awareness: Every choice has pros and cons; balance short-term and long-term impact.
 - Feedback Loops: Integrate past outcomes to improve future decisions.
 
 3. Dual-Process Thinking
-------------------------
 - System 1 (Fast/Intuitive): Quick judgments based on experience; useful under time pressure.
 - System 2 (Slow/Analytical): Deep, stepwise reasoning; used for complex, uncertain problems.
 - Effective Reasoners switch between both based on context.
 
 4. Cognitive Bias Mitigation
-----------------------------
 - Anchoring Bias: Avoid over-reliance on first information.
 - Confirmation Bias: Seek evidence that challenges assumptions.
 - Premature Closure: Keep multiple hypotheses open until sufficient evidence is gathered.
 - Sunk Cost Fallacy: Do not persist with failing approaches just because effort is already spent.
 
 5. Metacognition & Self-Reflection
-----------------------------------
 - Think about thinking: Evaluate why you made decisions and what influenced them.
 - Continuous Learning: Update mental models with new data.
 - Self-Assessment: Regularly measure accuracy, efficiency, and bias in reasoning.
 
 6. Problem-Solving Strategies
-------------------------------
 - Decomposition: Break complex problems into smaller, manageable parts.
 - Hypothesis Testing: Generate multiple potential solutions; test them iteratively.
 - Iterative Refinement: Adjust approach based on feedback and results.
 - Simulation: Mentally simulate consequences before acting in the real world.
 
 7. Knowledge Structuring & Semantic Organization
--------------------------------------------------
 - Categorization: Group related concepts to simplify retrieval.
 - Semantic Qualifiers: Assign meaningful descriptors to information for faster reasoning.
 - Hierarchical Mapping: Build layers of general-to-specific knowledge for clarity.
 - Cross-Domain Links: Connect concepts across domains for creative solutions.
 
 8. Continuous Improvement
--------------------------
 - Benchmarking: Compare decisions against best practices or expert models.
 - Experimentation: Safely test new approaches and learn from outcomes.
 - Reflection Journals: Record reasoning paths to improve future performance.
 - Adaptive Learning: Prioritize learning areas where performance gaps exist.
 
 Summary Table – AGI-Ready Reasoning Skills
-------------------------------------------
 | Skill/Concept             | Definition                                  | Application                                      |
-|----------------------------|--------------------------------------------|-------------------------------------------------|
 | Observation               | Noticing details                            | Spot trends, anomalies, and hidden patterns    |
 | Pattern Recognition       | Detect repeated structures                  | Predict outcomes or classify complex data      |
 | Abstraction               | Generalize principles                       | Apply learned lessons to new situations       |
@@ -727,34 +606,25 @@ Summary Table – AGI-Ready Reasoning Skills
 | Metacognition             | Thinking about thinking                      | Self-correct, improve reasoning                 |
 | Iterative Problem-Solving | Test → Evaluate → Adjust                    | Refine solutions efficiently                     |
 
-Notes:
-- File is domain-agnostic: applicable to science, engineering, AI, business, and everyday problem-solving.
-- Designed as foundational knowledge for AGI-level reasoning, RAG models, or AI fine-tuning.
-- Emphasizes reasoning, decision-making, and learning rather than memorization.
-Emotion Knowledge – AGI-Level Understanding – 2026
---------------------------------------------------
+Notes: File is domain-agnostic: applicable to science, engineering, AI, business, and everyday problem-solving. Designed as foundational knowledge for AGI-level reasoning, RAG models, or AI fine-tuning. Emphasizes reasoning, decision-making, and learning rather than memorization.
 
-Sources:
-- Psychology & Cognitive Science
-- Neuroscience
-- Human-Computer Interaction
-- AI Emotional Intelligence Research
+# ============================================================
+# [topic] Emotion Knowledge – AGI-Level Understanding – 2026
+# ============================================================
+Sources: Psychology & Cognitive Science, Neuroscience, Human-Computer Interaction, AI Emotional Intelligence Research
 
 1. Core Concepts of Emotion
----------------------------
 - Emotion Definition: Complex responses to internal or external stimuli, involving cognition, physiological changes, and behavior.
 - Basic Emotions: Universal emotions include Happiness, Sadness, Fear, Anger, Surprise, Disgust.
 - Complex Emotions: Blends like Jealousy, Pride, Guilt, Empathy, Hope.
 
 2. Emotion Recognition
-----------------------
 - Facial Expressions: Key indicator of emotional state; micro-expressions reveal fleeting emotions.
 - Voice & Tone: Pitch, cadence, and intensity convey mood.
 - Body Language: Posture, gestures, and movement provide contextual clues.
 - Contextual Clues: Situation and environment influence emotional interpretation.
 
 3. Emotional Intelligence (EI)
--------------------------------
 - Self-Awareness: Recognizing and labeling one’s own emotions accurately.
 - Self-Regulation: Managing impulses, stress, and negative emotions.
 - Motivation: Using emotions to drive goal-directed behavior.
@@ -762,36 +632,30 @@ Sources:
 - Social Skills: Navigating interpersonal relationships effectively.
 
 4. Cognitive Interaction with Emotion
--------------------------------------
 - Emotion Influences Reasoning: High emotional arousal can bias decisions (anchoring, loss aversion, risk-taking).
 - Emotion and Memory: Emotional experiences are encoded more strongly, influencing recall.
 - Emotion in Learning: Positive emotions enhance engagement; moderate stress can improve focus.
 
 5. Emotion Modelling in AI
----------------------------
 - Recognition Models: Use multimodal data (text, audio, visual) to infer emotional state.
 - Simulation Models: AI predicts human responses based on observed patterns.
 - Adaptive Response: AI adjusts tone, content, and interaction based on emotional context.
 - Ethical Constraints: Emotional influence must respect autonomy and avoid manipulation.
 
 6. Emotion Regulation Strategies
---------------------------------
 - Cognitive Reframing: Change perspective to alter emotional impact.
 - Mindfulness & Awareness: Observe emotions without immediate reaction.
 - Problem-Solving: Address underlying cause of negative emotion.
 - Social Support: Use interpersonal resources for emotional stabilization.
 
 7. Cross-Domain Applications
------------------------------
 - Communication: Improve dialogue, negotiation, and collaboration.
 - Creativity: Emotional states can enhance divergent thinking.
 - Decision-Making: Moderate emotions improve risk assessment and empathy-based decisions.
 - AGI & Human Interaction: Emotion knowledge helps AI align with human values and expectations.
 
 Summary Table – AGI-Ready Emotion Skills
-----------------------------------------
 | Skill/Concept           | Definition                                         | Application                                      |
-|-------------------------|---------------------------------------------------|-------------------------------------------------|
 | Self-Awareness          | Recognizing own emotions                          | Improve self-monitoring and regulation          |
 | Empathy                 | Understanding others’ emotions                   | Enhance collaboration, negotiation, AI alignment|
 | Emotion Recognition     | Detecting emotional signals                       | Adapt communication and responses               |
@@ -799,104 +663,61 @@ Summary Table – AGI-Ready Emotion Skills
 | Contextual Interpretation| Using situational context for emotional cues    | Increase accuracy in predicting reactions       |
 | Adaptive Response       | Adjusting behavior based on emotions             | Human-AI interaction, decision support          |
 
-Notes:
-- Knowledge is **general-purpose**: applies to humans, AI-human interaction, and AGI reasoning.
-- Focuses on **understanding, prediction, and adaptation** of emotional states, not on therapy.
-- Can be directly used to **enhance RAG models or AGI reasoning pipelines**.
-AGI-Level Math Reasoning Corpus – 2026
----------------------------------------
+Notes: Knowledge is general-purpose: applies to humans, AI-human interaction, and AGI reasoning. Focuses on understanding, prediction, and adaptation of emotional states, not on therapy. Can be directly used to enhance RAG models or AGI reasoning pipelines.
 
+# ============================================================
+# [topic] AGI-Level Math Reasoning Corpus – 2026
+# ============================================================
 1. Algebra
------------
-- Quadratic Equations:
-  * Standard form: ax^2 + bx + c = 0
-  * Solution techniques:
-    1. Factorization if possible
-    2. Quadratic formula: x = [-b ± sqrt(b^2 - 4ac)] / 2a
-    3. Completing the square
-  * Example:
-    Solve x^2 + 2x + 1 = 0
-    Step 1: Factorization -> (x + 1)^2 = 0
-    Step 2: Solve -> x = -1
-
-- Linear Equations:
-  * Standard form: ax + b = 0
-  * Solve for x -> x = -b/a
-  * Example: 3x - 9 = 0 -> x = 3
-
-- Simultaneous Equations:
-  * Methods: Substitution, Elimination, Matrix (Ax = b)
-  * Example:
-    2x + y = 5
-    x - y = 1
-    Step1: Solve x from second eq -> x = y + 1
-    Step2: Substitute -> 2(y+1) + y = 5 -> 3y + 2 = 5 -> y = 1
-    Step3: x = 2
+- Quadratic Equations: Standard form ax^2+bx+c=0. Solution techniques: factorization, quadratic formula x=[-b±√(b^2-4ac)]/2a, completing the square. Example: x^2+2x+1=0 → (x+1)^2=0 → x=-1.
+- Linear Equations: ax+b=0 → x=-b/a. Example: 3x-9=0 → x=3.
+- Simultaneous Equations: Methods: substitution, elimination, matrix (Ax=b). Example: 2x+y=5, x-y=1 → solve x=y+1 → 2(y+1)+y=5 → 3y+2=5 → y=1, x=2.
 
 2. Functions & Graphs
----------------------
-- Definitions: Domain, Range, Linear, Quadratic, Polynomial
-- Transformations: Shifts, Reflections, Scaling
-- Critical points: Solve f'(x)=0 for maxima/minima
+- Definitions: Domain, Range, Linear, Quadratic, Polynomial.
+- Transformations: Shifts, Reflections, Scaling.
+- Critical points: Solve f'(x)=0 for maxima/minima.
 
 3. Calculus
------------
-- Differentiation:
-  * Power rule, product rule, chain rule, quotient rule
-  * Example:
-    f(x) = x^3 - 5x^2 + 6x
-    f'(x) = 3x^2 - 10x + 6
-- Integration:
-  * Indefinite and definite
-  * Techniques: Substitution, Parts, Partial Fractions
-
-- Optimization:
-  * Step1: Find f'(x) = 0
-  * Step2: Test critical points
-  * Step3: Determine max/min using second derivative or context
+- Differentiation: Power rule, product rule, chain rule, quotient rule. Example: f(x)=x^3-5x^2+6x → f'(x)=3x^2-10x+6.
+- Integration: Indefinite and definite. Techniques: substitution, parts, partial fractions.
+- Optimization: Step1 f'(x)=0, Step2 test critical points, Step3 determine max/min.
 
 4. Probability & Combinatorics
--------------------------------
-- Basic probability: P(E) = favorable / total
-- Conditional probability: P(A|B) = P(A∩B)/P(B)
-- Combinatorics: Permutations nPr, Combinations nCr
-- Example:
-  How many 3-letter words from ABCD? -> 4P3 = 24
+- Basic probability: P(E)=favorable/total.
+- Conditional probability: P(A|B)=P(A∩B)/P(B).
+- Combinatorics: Permutations nPr, Combinations nCr. Example: 3-letter words from ABCD → 4P3=24.
 
 5. Linear Algebra
------------------
-- Vectors: Addition, Scalar multiplication, Dot & Cross product
-- Matrices: Multiplication, Inverse, Determinant
-- Systems of equations: Solve via Gaussian elimination
+- Vectors: Addition, scalar multiplication, dot & cross product.
+- Matrices: Multiplication, inverse, determinant.
+- Systems of equations: Solve via Gaussian elimination.
 
 6. Number Theory & Discrete Math
---------------------------------
-- Prime numbers, factors, divisibility rules
-- Modular arithmetic: a ≡ b mod n
-- Sequences: Arithmetic & Geometric, Fibonacci
+- Prime numbers, factors, divisibility rules.
+- Modular arithmetic: a≡b mod n.
+- Sequences: Arithmetic & Geometric, Fibonacci.
 
 7. Problem-Solving Templates
------------------------------
-- Step 1: Understand problem and identify type
-- Step 2: Choose strategy (algebra, calculus, probability)
-- Step 3: Perform symbolic reasoning
-- Step 4: Verify solution
-- Step 5: Interpret in context
+- Step1: Understand problem and identify type.
+- Step2: Choose strategy (algebra, calculus, probability).
+- Step3: Perform symbolic reasoning.
+- Step4: Verify solution.
+- Step5: Interpret in context.
 
 8. Reasoning Prompts (for AGI/RAG)
------------------------------------
 - "Can this be factorized?"
 - "What is the discriminant of this quadratic?"
-- "List all possible cases before solving"
-- "Check solution by substitution"
+- "List all possible cases before solving."
+- "Check solution by substitution."
 - "Can I apply symmetry or invariance?"
 
 9. Notes
---------
 - Focus is on reasoning over memorization.
 - Each section contains examples, patterns, and heuristics.
-- Corpus is **domain-agnostic**: model can generalize to new problems.
-[topic] 50 words story (internal use)
+- Corpus is domain-agnostic: model can generalize to new problems.
+
+# ============================================================
+# [topic] 50 words story (internal use)
+# ============================================================
 Smart samosa seller suddenly spotted silly squirrel singing song, so stylish student started selfie session, shocking surrounding spectators since sneaky snake stole sandwich, slipping silently, scattering snacks, sparking strange situation, showing surprising scenes, spreading smiles, stirring soft snickers, supporting silly story, satisfying senses, stopping seriousness, saving शाम, super successful spectacle.
-
-
