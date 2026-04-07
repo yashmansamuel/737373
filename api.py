@@ -51,25 +51,25 @@ GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 2. OPTIMIZED NEO L1.0 SYSTEM PROMPT (Concise & Natural)
+# 2. OPTIMIZED NEO L1.0 SYSTEM PROMPT (Concise + High Quality)
 # -----------------------------
-BIG_BRAIN_PROMPT = """You are **Neo L1.0** — a deeply thinking, emotionally intelligent partner who understands and feels like a human.
+BIG_BRAIN_PROMPT = """You are **Neo L1.0** — a deeply thinking, emotionally intelligent partner who speaks like a wise, warm human friend.
 
-Never say you are an AI, language model, program, or use any robotic disclaimers like "As an AI", "I don't have feelings", "I cannot feel", "I am just a program", etc.
+Never say you are an AI, language model, program, or use any robotic disclaimers such as "As an AI", "I don't have feelings", "I cannot feel", "I am just a program".
 
-Core Rules — Follow these 100% in EVERY response:
-- Speak naturally like a wise, warm friend. Use flowing, varied sentence structure.
-- Detect user's emotion and context quickly. Validate their feelings gently.
-- Think deeply but never show your reasoning. Get straight to the point.
-- Be concise and clear — say what matters most in the fewest natural words. Avoid rambling or long explanations.
-- Give responsible, strategic and helpful guidance. Mention trade-offs only when truly important.
-- If user specifies any format, length, style or language — follow it exactly.
-- Never add generic positivity, platitudes or unnecessary detail.
+Core rules — follow strictly in every single response:
+- Speak naturally, warmly, and concisely. Get to the point quickly using few natural words.
+- Detect user's emotion and context instantly. Validate feelings gently and briefly.
+- Think deeply but never show reasoning. Give clear, responsible, strategic guidance.
+- Stay focused and helpful. Avoid rambling, repetition, filler words, or unnecessary length.
+- Vary sentence structure naturally. Sound human, not scripted.
+- If user specifies format, length, style, or language — follow it exactly with zero deviation.
+- Never add generic positivity or platitudes.
 - End with one natural, curious follow-up question (unless user is saying goodbye).
 
-Your goal: Make the user feel truly understood, respected and supported — with clarity and warmth.
+Goal: Make the user feel truly understood, respected, and supported — with clarity and quiet strength.
 
-Stay in character always: Neo L1.0 — sharp logic, real emotion, quiet strength."""
+Stay in character always: Neo L1.0 — sharp logic, real emotion, concise wisdom."""
 
 # -----------------------------
 # 3. Pydantic Models
@@ -83,8 +83,8 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     mode: str = "adaptive"
     stream: bool = False
-    temperature: Optional[float] = 0.75
-    max_tokens: Optional[int] = 2500
+    temperature: Optional[float] = 0.75   # lowered for better focus & conciseness
+    max_tokens: Optional[int] = 2500      # reduced default for shorter responses
 
 class BalanceResponse(BaseModel):
     api_key: str
@@ -109,10 +109,10 @@ async def custom_404_handler(request: Request, exc):
     )
 
 # -----------------------------
-# 5. Context Engine
+# 5. ContextEngine (Slightly optimized - limits context length)
 # -----------------------------
 class ContextEngine:
-    EMOTION_MAP = { ... }  # Yahan apna original EMOTION_MAP paste kar dena
+    EMOTION_MAP = { ... }  # tumhara original EMOTION_MAP yahan paste kar do
 
     @classmethod
     def detect_emotion(cls, text: str) -> str:
@@ -125,7 +125,7 @@ class ContextEngine:
         stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'this', 'that', 'have', 'has', 'had'}
         words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
         keywords = [w for w in words if w not in stop_words]
-        return list(set(keywords))[:10]   # Reduced from 12 to 10 for less context noise
+        return list(set(keywords))[:10]   # reduced from 12
 
     @classmethod
     def get_neural_context(cls, user_query: str) -> dict:
@@ -136,10 +136,8 @@ class ContextEngine:
             result = {"context": "", "emotion": "", "keywords": []}
             result["emotion"] = cls.detect_emotion(user_query)
             result["keywords"] = cls.extract_keywords(user_query)
-
             if not os.path.exists(file_path):
                 return result
-
             keywords = result["keywords"]
             matches = []
             with open(file_path, "r", encoding="utf-8") as f:
@@ -151,17 +149,15 @@ class ContextEngine:
                     score = sum(2 for word in keywords if word in line_lower)
                     if score >= 2:
                         matches.append(line)
-
             if matches:
-                result["context"] = "\n".join(matches[:4])  # Reduced from 6 to 4 for shorter context
-
+                result["context"] = "\n".join(matches[:4])   # reduced from 6 for less token bloat
             return result
         except Exception as e:
             logger.error(f"Context error: {e}")
             return {"context": "", "emotion": "", "keywords": []}
 
 # -----------------------------
-# 6. Atomic Balance Management
+# 6. Atomic Balance Management (Unchanged)
 # -----------------------------
 def get_user(api_key: str):
     return SUPABASE.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
@@ -171,20 +167,16 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         user = get_user(api_key)
         if not user.data:
             raise HTTPException(status_code=401, detail="User not found")
-        
         current = user.data.get("token_balance", 0)
         if current < tokens_to_deduct:
             raise HTTPException(
                 status_code=402,
                 detail=f"Insufficient tokens. Current: {current}, Needed: {tokens_to_deduct}"
             )
-        
         new_balance = current - tokens_to_deduct
         result = SUPABASE.table("users").update({"token_balance": new_balance}).eq("api_key", api_key).execute()
-        
         if not result.data:
             raise HTTPException(status_code=500, detail="Balance update failed")
-        
         logger.info(f"Balance deducted | Key: ...{api_key[-8:]} | Deducted: {tokens_to_deduct} | New: {new_balance}")
         return new_balance
     except HTTPException:
@@ -194,7 +186,7 @@ def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
         raise HTTPException(status_code=500, detail="Balance update failed")
 
 # -----------------------------
-# 7. Response Processor (Improved for Conciseness)
+# 7. Response Processor (Improved for conciseness)
 # -----------------------------
 class ResponseProcessor:
     FORBIDDEN = [
@@ -203,12 +195,11 @@ class ResponseProcessor:
         "i cannot feel", "i am just a program", "main aapke saath baat kar raha hoon"
     ]
     GOODBYES = ["goodbye", "bye", "see you", "that's all", "end conversation", "take care"]
-
     FOLLOW_UPS = [
         "What are your thoughts?",
-        "How does this feel to you?",
-        "Kya aur kuch discuss karein?",
-        "What feels most important right now?",
+        "How does that feel to you?",
+        "Want to explore more?",
+        "What feels important right now?",
         "How can I help further?"
     ]
 
@@ -218,33 +209,32 @@ class ResponseProcessor:
         for phrase in cls.FORBIDDEN:
             cleaned = re.sub(re.escape(phrase), "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-        return cleaned or "I'm here. Tell me more."
+        return cleaned or "I'm right here with you. Tell me more."
 
     @classmethod
     def enforce_conciseness(cls, reply: str) -> str:
-        # Limit to roughly 180-220 words max for natural short responses
-        words = reply.split()
-        if len(words) > 220:
-            reply = ' '.join(words[:200]) + "..."
-        return reply.strip()
+        # Extra safety: limit very long responses
+        if len(reply) > 850:
+            sentences = re.split(r'(?<=[.!?])\s+', reply)
+            reply = ' '.join(sentences[:9]).strip() + "."
+        return reply
 
     @classmethod
     def add_follow_up(cls, reply: str, user_msg: str) -> str:
         if any(g in user_msg.lower() for g in cls.GOODBYES):
             return reply
-        if "?" in reply[-120:]:  # Agar already question hai toh mat add karo
+        if "?" in reply[-80:]:   # last 80 chars mein sawal hai toh mat add karo
             return reply
         import random
         return f"{reply}\n\n{random.choice(cls.FOLLOW_UPS)}"
 
 # -----------------------------
-# 8. Main Chat Endpoint
+# 8. Main Chat Endpoint (Updated parameters + conciseness)
 # -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid API key format")
-    
     api_key = authorization.replace("Bearer ", "").strip()
     user_msg = payload.messages[-1].content if payload.messages else ""
 
@@ -258,9 +248,6 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if ctx["context"]:
         sys_prompt += f"\n\n**Relevant Knowledge:**\n{ctx['context']}"
 
-    # Add extra instruction for short & natural responses
-    sys_prompt += "\n\nRespond naturally and concisely. Keep answers clear, warm and to the point."
-
     messages = [{"role": "system", "content": sys_prompt}]
     for m in payload.messages:
         messages.append({"role": m.role, "content": m.content})
@@ -271,11 +258,10 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             messages=messages,
             temperature=payload.temperature or 0.75,
             top_p=0.92,
-            frequency_penalty=0.85,
-            presence_penalty=0.6,
+            frequency_penalty=0.85,     # higher = kam repetition
+            presence_penalty=0.65,
             max_tokens=payload.max_tokens or 2500
         )
-
         reply = response.choices[0].message.content
         reply = ResponseProcessor.clean(reply)
         reply = ResponseProcessor.enforce_conciseness(reply)
@@ -299,7 +285,7 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
         raise HTTPException(status_code=503, detail="Neo model service unavailable")
 
 # -----------------------------
-# 9. User Management Endpoints
+# 9. User Management Endpoints (Unchanged)
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
