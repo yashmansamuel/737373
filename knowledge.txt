@@ -1,3 +1,9 @@
-{"id": 1, "question": "What major AI model was released by Google in late 2024?", "context": "In December 2024, Google unveiled Gemini Ultra 2.0, a multimodal AI model capable of processing video, audio, and text simultaneously. It outperformed GPT-4 on 30 out of 32 benchmarks.", "answer": "Gemini Ultra 2.0"}
-{"id": 2, "question": "Which country successfully landed a spacecraft on the Moon's south pole in 2025?", "context": "India's Chandrayaan-4 mission achieved a soft landing near the lunar south pole on March 15, 2025, deploying a rover to search for water ice deposits.", "answer": "India"}
-{"id": 3, "question": "What was the global inflation rate in OECD countries as of mid-2026?", "context": "According to OECD Economic Outlook published in June 2026, the average inflation rate across 38 member countries fell to 2.3% year-over-year, down from 5.7% in 2024.", "answer": "2.3%"}
+[EMOTION] Apne emotions ko samajhna strength hai, weakness nahi.
+[TECH] AI assistants in 2025 can predict human behavior with 80% accuracy.
+[PRODUCTIVITY] Consistency beats intensity in long-term success.
+[EMOTION] Dard chhupana aksar zyada takleef deta hai.
+[LIFE] Small daily wins compound into massive long-term growth.
+[TECH] Cybersecurity threats in 2025 are evolving faster than ever.
+[RELATIONSHIP] Listening fully matters more than speaking perfectly.
+[EMOTION] Khushi ka asli source meaning aur purpose hai, pleasure nahi.
+[TECH] Distributed architectures scale better than monolithic systems.
