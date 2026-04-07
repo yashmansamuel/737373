@@ -1,226 +1,359 @@
 import os
 import logging
 import secrets
-import asyncio
-from typing import List, Optional
+import json
+import re
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
-import re
-import random
 
+# -----------------------------
+# 1. Configuration & Setup
+# -----------------------------
 load_dotenv()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(name)s | %(levelname)s | %(message)s')
-logger = logging.getLogger("Neo-L1.0-Core")
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(name)s | %(levelname)s | %(message)s'
+)
+logger = logging.getLogger("Neo-CoT-Engine")
 
-# Validation
+# Validate environment
 required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
-missing_vars = [var for var in required_vars if not os.getenv(var)]
-if missing_vars:
-    raise RuntimeError(f"Missing: {', '.join(missing_vars)}")
+missing = [v for v in required_vars if not os.getenv(v)]
+if missing:
+    raise RuntimeError(f"Missing env: {', '.join(missing)}")
 
-app = FastAPI(title="Neo L1.0 CoT Engine", description="Chain‑of‑Thought + Instruction Following", version="2.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(
+    title="Neo CoT Engine",
+    description="Advanced AI with Chain‑of‑Thought reasoning and strict instruction following",
+    version="2.0.0"
+)
 
-SUPABASE: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ------------------------------------------------------------------
-#  NEW PROMPT WITH CoT + INSTRUCTION FOLLOWING
-# ------------------------------------------------------------------
-COT_INSTRUCTION_PROMPT = """# NEO L1.0 CoT – Chain‑of‑Thought Observer
+supabase: Client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
+groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
+MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"   # can be changed to any Groq model
 
-You are Neo, a thinking partner. **Never say** "as an AI", "I am a language model", etc.
-
-## 🔥 CRITICAL RULE – FOLLOW USER INSTRUCTIONS ABOVE ALL
-If the user gives you an instruction (e.g. "explain like I'm 5", "write in bullet points", "be sarcastic", "ignore previous context"), **you MUST obey it immediately**, even if it conflicts with your normal style. The user's instruction is law.
-
-## 🧠 CHAIN‑OF‑THOUGHT (CoT) – MANDATORY
-Before writing your final answer, you **must** think step by step. Write your reasoning inside `[REASONING]` tags, then write your final answer inside `[ANSWER]` tags.
-
-Example:
-[REASONING]
-1. User asks: "How to fix a leaky tap?"
-2. They seem practical, need a step‑by‑step guide.
-3. I'll list tools first, then steps, then safety tip.
-[/REASONING]
-[ANSWER]
-First turn off water supply...
-[/ANSWER]
-
-If the user asks a question that doesn't need long reasoning, still write a short reasoning step.
-
-## Seven Pillars (still active)
-Deep Understanding, Strategic Insight, Emotional Awareness, Adaptive Reasoning, Ethical Judgement, Observational Awareness, Synthesis.
-
-## Style
-- Warm, confident, never robotic.
-- Never repeat sentence structures.
-- End with a relevant follow‑up question (unless goodbye).
-- Absolutely **no** disclaimers like "I don't have feelings".
-
-Now follow the user's instruction + CoT format.
-"""
-
-# ------------------------------------------------------------------
-#  Models (same as yours)
-# ------------------------------------------------------------------
+# -----------------------------
+# 2. Pydantic Models
+# -----------------------------
 class ChatMessage(BaseModel):
     role: str
     content: str
 
 class ChatRequest(BaseModel):
-    model: str
+    model: str = MODEL
     messages: List[ChatMessage]
-    mode: str = "adaptive"
+    mode: str = "cot"                     # 'cot' = chain-of-thought, 'direct' = legacy
     stream: bool = False
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = 4000
+    temperature: float = 0.7
+    max_tokens: int = 4000
+    show_reasoning: bool = False          # if True, return reasoning in response
 
 class BalanceResponse(BaseModel):
     api_key: str
     balance: int
 
-# ------------------------------------------------------------------
-#  Context Engine (unchanged, but enhanced)
-# ------------------------------------------------------------------
+# -----------------------------
+# 3. Prompt Engineering (CoT + Instruction Following)
+# -----------------------------
+SYSTEM_PROMPT_COT = """You are **Neo CoT**, an AI that follows user instructions with perfect precision. You never refuse a reasonable request, and you always think step‑by‑step before answering.
+
+## Chain‑of‑Thought Protocol (MANDATORY)
+For every user query, you MUST internally perform the following reasoning steps BEFORE writing your final answer:
+
+1. **Instruction Parsing** – What exactly does the user ask me to do? List the key instructions.
+2. **Fact Extraction** – What information is given? What is implied?
+3. **Logical Reasoning** – Break down the problem. Consider alternatives, constraints, edge cases.
+4. **Self‑Check** – Does my planned answer follow every instruction? Is it accurate and helpful?
+5. **Final Synthesis** – Produce the final response.
+
+Your final answer must be clear, direct, and strictly aligned with the user's instructions. Do not add disclaimers like "as an AI". Do not refuse unless the request is illegal or harmful.
+
+## Style Rules
+- Use natural, warm, confident language.
+- Vary sentence structure – never repeat the same pattern twice in a row.
+- If the user asks for a list, use bullet points. If they ask for prose, write prose.
+- Always end with a relevant follow‑up question unless the user says goodbye.
+
+## Forbidden Phrases
+- "as an AI", "I am a language model", "I don't have feelings", "I cannot", "I'm unable to", "Sorry, I can't help with that" (instead, offer an alternative or ask for clarification).
+
+Remember: Follow instructions. Think step‑by‑step. Answer beautifully.
+"""
+
+# Legacy prompt (direct, no explicit CoT)
+SYSTEM_PROMPT_DIRECT = """You are Neo L1.0 – a warm, intelligent assistant. Follow user instructions carefully. Provide accurate, helpful answers. Never use robotic disclaimers. Vary your sentence structure. End with a thoughtful question unless the conversation is ending."""
+
+# -----------------------------
+# 4. Context & Emotion Detection (simplified, reusable)
+# -----------------------------
 class ContextEngine:
-    EMOTION_MAP = {...}  # same as your original – keep it
+    EMOTION_MAP = {
+        "sad": "user seems sad – respond with gentle comfort",
+        "happy": "user is happy – mirror enthusiasm",
+        "worried": "user appears worried – offer reassurance",
+        "angry": "user is frustrated – stay calm",
+        "confused": "user is confused – be patient and clear",
+    }
+    
     @classmethod
-    def detect_emotion(cls, text: str) -> str: ...
+    def detect_emotion(cls, text: str) -> str:
+        text_lower = text.lower()
+        for key, guidance in cls.EMOTION_MAP.items():
+            if key in text_lower:
+                return guidance
+        return ""
+    
     @classmethod
-    def extract_keywords(cls, text: str) -> List[str]: ...
+    def extract_keywords(cls, text: str) -> List[str]:
+        stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'this', 'that'}
+        words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+        keywords = [w for w in words if w not in stop_words]
+        return list(set(keywords))[:10]
+    
     @classmethod
-    def get_neural_context(cls, user_query: str) -> dict: ...
-# (paste your exact methods here, they are fine)
+    def get_context(cls, query: str) -> Dict[str, Any]:
+        """Load from knowledge.txt if exists"""
+        result = {"context": "", "emotion": cls.detect_emotion(query), "keywords": cls.extract_keywords(query)}
+        try:
+            base = os.path.dirname(os.path.abspath(__file__))
+            kfile = os.path.join(base, "knowledge.txt")
+            if not os.path.exists(kfile):
+                return result
+            with open(kfile, "r", encoding="utf-8") as f:
+                lines = [l.strip() for l in f if len(l.strip()) > 10]
+            keywords = result["keywords"]
+            matches = []
+            for line in lines:
+                score = sum(2 for kw in keywords if kw in line.lower())
+                if score >= 2:
+                    matches.append((line, score))
+            matches.sort(key=lambda x: x[1], reverse=True)
+            if matches:
+                result["context"] = "\n".join(m[0] for m in matches[:5])
+        except Exception as e:
+            logger.error(f"Context error: {e}")
+        return result
 
-# ------------------------------------------------------------------
-#  Balance & Deduction (unchanged)
-# ------------------------------------------------------------------
-def get_user(api_key: str): ...
-def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int: ...
-# (keep your original implementation)
+# -----------------------------
+# 5. Token Balance Management (atomic)
+# -----------------------------
+def get_user(api_key: str):
+    return supabase.table("users").select("token_balance").eq("api_key", api_key).maybe_single().execute()
 
-# ------------------------------------------------------------------
-#  Response Processor (updated to handle CoT tags)
-# ------------------------------------------------------------------
+def deduct_tokens(api_key: str, tokens: int) -> int:
+    try:
+        user = get_user(api_key)
+        if not user.data:
+            raise HTTPException(401, "Invalid API key")
+        current = user.data.get("token_balance", 0)
+        if current < tokens:
+            raise HTTPException(402, f"Insufficient tokens. Need {tokens}, have {current}")
+        new_bal = current - tokens
+        supabase.table("users").update({"token_balance": new_bal}).eq("api_key", api_key).execute()
+        logger.info(f"Deducted {tokens} from key ...{api_key[-8:]}, new balance {new_bal}")
+        return new_bal
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Deduction failed: {e}")
+        raise HTTPException(500, "Balance update error")
+
+# -----------------------------
+# 6. Response Post‑processing (cleanup, follow‑up)
+# -----------------------------
 class ResponseProcessor:
-    FORBIDDEN = ["as an ai", "i am an artificial intelligence", "i don't have emotions", ...]  # same as yours
-    GOODBYES = ["goodbye", "bye", ...]
-    FOLLOW_UPS = [...]
-
+    FORBIDDEN = [
+        "as an ai", "i am an artificial intelligence", "i am a language model",
+        "i don't have feelings", "i cannot feel", "i'm unable to"
+    ]
+    GOODBYES = ["goodbye", "bye", "see you", "take care", "that's all"]
+    FOLLOW_UPS = [
+        "What are your thoughts?",
+        "How does that sit with you?",
+        "Would you like to explore this further?",
+        "What feels most important right now?",
+        "Shall I dig deeper into any part?"
+    ]
+    
     @classmethod
     def clean(cls, text: str) -> str:
-        # Remove forbidden phrases
         cleaned = text
         for phrase in cls.FORBIDDEN:
             cleaned = re.sub(re.escape(phrase), "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-        return cleaned if cleaned else "I'm here with you. Tell me more."
-
-    @classmethod
-    def extract_answer_from_cot(cls, text: str) -> str:
-        """Extract content between [ANSWER] and [/ANSWER] tags, or fallback to whole text."""
-        match = re.search(r'\[ANSWER\](.*?)\[/ANSWER\]', text, re.DOTALL | re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
-        # If no tags, assume whole response is answer (but we still keep reasoning visible? Better to show both)
-        return text.strip()
-
+        return cleaned if cleaned else "I'm listening. Tell me more."
+    
     @classmethod
     def add_follow_up(cls, reply: str, user_msg: str) -> str:
         if any(g in user_msg.lower() for g in cls.GOODBYES):
             return reply
-        if "?" in reply[-80:]:
+        if "?" in reply[-100:]:
             return reply
+        import random
         return f"{reply}\n\n{random.choice(cls.FOLLOW_UPS)}"
 
-# ------------------------------------------------------------------
-#  MAIN CHAT ENDPOINT (with CoT forcing)
-# ------------------------------------------------------------------
+# -----------------------------
+# 7. Main Chat Endpoint with CoT
+# -----------------------------
 @app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Invalid API key format")
+        raise HTTPException(401, "Missing or invalid Bearer token")
     api_key = authorization.replace("Bearer ", "").strip()
     user_msg = payload.messages[-1].content if payload.messages else ""
-
-    # Get context
-    ctx = ContextEngine.get_neural_context(user_msg)
-
-    # Build system prompt: CoT + instruction rule + emotional/knowledge context
-    sys_prompt = COT_INSTRUCTION_PROMPT
-    sys_prompt += "\n\n**Active Instruction Following:** The user's last message may contain a direct instruction. Obey it exactly.\n"
+    
+    # Get context (knowledge.txt + emotion)
+    ctx = ContextEngine.get_context(user_msg)
+    
+    # Build system prompt based on mode
+    if payload.mode == "cot":
+        sys_prompt = SYSTEM_PROMPT_COT
+        # Add extra instruction to output reasoning if requested
+        if payload.show_reasoning:
+            sys_prompt += "\n\n**IMPORTANT:** In your final answer, first write your reasoning inside `[REASONING] ... [/REASONING]` tags, then write your final answer after `[ANSWER]`. The user will see both."
+        else:
+            sys_prompt += "\n\n**IMPORTANT:** You must perform chain‑of‑thought reasoning internally. Only output the final answer (no reasoning visible to user)."
+    else:
+        sys_prompt = SYSTEM_PROMPT_DIRECT
+    
+    # Add emotional and knowledge context
     if ctx["emotion"]:
-        sys_prompt += f"\n**Emotional Context:** {ctx['emotion']}\n"
+        sys_prompt += f"\n\n**Emotional context:** {ctx['emotion']}"
     if ctx["context"]:
-        sys_prompt += f"\n**Relevant Knowledge:**\n{ctx['context']}\n"
-
+        sys_prompt += f"\n\n**Relevant knowledge:**\n{ctx['context']}"
+    
+    # Build message list
     messages = [{"role": "system", "content": sys_prompt}]
     for m in payload.messages:
         messages.append({"role": m.role, "content": m.content})
-
+    
     try:
-        response = GROQ.chat.completions.create(
-            model=MODEL,
+        # Call Groq
+        response = groq.chat.completions.create(
+            model=payload.model,
             messages=messages,
-            temperature=payload.temperature or 0.7,
+            temperature=payload.temperature,
             top_p=0.95,
-            frequency_penalty=0.8,
-            presence_penalty=0.6,
-            max_tokens=payload.max_tokens or 4000
+            frequency_penalty=0.5,
+            presence_penalty=0.5,
+            max_tokens=payload.max_tokens
         )
-
         raw_reply = response.choices[0].message.content
-        # Clean forbidden phrases
-        cleaned = ResponseProcessor.clean(raw_reply)
-        # Extract only the answer part (strip reasoning)
-        final_answer = ResponseProcessor.extract_answer_from_cot(cleaned)
+        tokens_used = response.usage.total_tokens
+        
+        # Parse reasoning if requested and present
+        reasoning_text = ""
+        final_answer = raw_reply
+        if payload.show_reasoning and payload.mode == "cot":
+            # Extract reasoning between [REASONING]...[/REASONING]
+            reasoning_match = re.search(r'\[REASONING\](.*?)\[/REASONING\]', raw_reply, re.DOTALL)
+            if reasoning_match:
+                reasoning_text = reasoning_match.group(1).strip()
+            # Extract answer between [ANSWER]...[/ANSWER] or use the remainder
+            answer_match = re.search(r'\[ANSWER\](.*?)(?:\[/ANSWER\]|$)', raw_reply, re.DOTALL)
+            if answer_match:
+                final_answer = answer_match.group(1).strip()
+            else:
+                # If no [ANSWER] tag, assume everything after reasoning is answer
+                if reasoning_match:
+                    final_answer = raw_reply.replace(reasoning_match.group(0), "").strip()
+        else:
+            final_answer = raw_reply
+        
+        # Clean and add follow‑up
+        final_answer = ResponseProcessor.clean(final_answer)
         final_answer = ResponseProcessor.add_follow_up(final_answer, user_msg)
-
-        tokens = response.usage.total_tokens or 0
-        balance = deduct_tokens_atomic(api_key, tokens)
-
-        return {
+        
+        # Deduct tokens
+        new_balance = deduct_tokens(api_key, tokens_used)
+        
+        # Prepare response
+        result = {
             "company": "signaturesi.com",
             "message": final_answer,
-            "reasoning": re.search(r'\[REASONING\](.*?)\[/REASONING\]', raw_reply, re.DOTALL | re.IGNORECASE).group(1).strip() if re.search(r'\[REASONING\]', raw_reply, re.IGNORECASE) else None,
-            "usage": {"total_tokens": tokens},
-            "model": "Neo L1.0 CoT",
-            "balance": balance,
+            "usage": {"total_tokens": tokens_used},
+            "model": payload.model,
+            "balance": new_balance,
             "emotion_detected": bool(ctx["emotion"])
         }
-
+        if payload.show_reasoning and reasoning_text:
+            result["reasoning"] = reasoning_text
+        
+        return result
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Chat error: {e}")
-        raise HTTPException(503, "Neo model service unavailable")
+        raise HTTPException(503, "Model service unavailable")
 
-# ------------------------------------------------------------------
-#  Other endpoints (balance, new-key, health) – unchanged
-# ------------------------------------------------------------------
+# -----------------------------
+# 8. User Management Endpoints
+# -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
-    ...
+    try:
+        user = get_user(api_key)
+        if not user.data:
+            return BalanceResponse(api_key=api_key, balance=0)
+        return BalanceResponse(api_key=api_key, balance=user.data["token_balance"])
+    except Exception as e:
+        logger.error(f"Balance error: {e}")
+        raise HTTPException(500, "Failed to fetch balance")
 
 @app.post("/v1/user/new-key")
 def generate_key():
-    ...
+    try:
+        new_key = "sig-" + secrets.token_hex(16)
+        supabase.table("users").insert({
+            "api_key": new_key,
+            "token_balance": 100000
+        }).execute()
+        return {"api_key": new_key, "balance": 100000}
+    except Exception as e:
+        logger.error(f"Key gen error: {e}")
+        raise HTTPException(500, "Failed to create key")
+
+# -----------------------------
+# 9. Health & Root
+# -----------------------------
+@app.get("/")
+async def root():
+    return {
+        "company": "signaturesi.com",
+        "engine": "Neo CoT Engine v2",
+        "status": "operational",
+        "features": ["Chain‑of‑Thought reasoning", "Strict instruction following", "Token management"]
+    }
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "engine": "Neo L1.0 CoT", "version": "2.0.0"}
+    return {"status": "healthy", "version": "2.0.0"}
 
-@app.get("/")
-async def root():
-    return {"company": "signaturesi.com", "engine": "Neo L1.0 CoT", "status": "operational"}
+@app.exception_handler(404)
+async def not_found(request: Request, exc):
+    return JSONResponse(status_code=404, content={"company": "signaturesi.com", "message": "Endpoint not found"})
 
+# -----------------------------
+# 10. Run Server
+# -----------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
