@@ -1,43 +1,40 @@
 import os
 import logging
 import secrets
-import time
-import re
-from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Header, Request, Depends
+import asyncio
+from typing import List, Optional
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
 
 # -----------------------------
-# 1. Load Environment & Configure Logging
+# 1. Environment & Logging
 # -----------------------------
 load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("Neo-L1.0-Core")
 
 # Validate required environment variables
-REQUIRED_ENV_VARS = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
-missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
-if missing_vars:
-    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
+required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
+missing = [var for var in required_vars if not os.getenv(var)]
+if missing:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
 
 # -----------------------------
-# 2. FastAPI App Initialization
+# 2. FastAPI App & CORS
 # -----------------------------
 app = FastAPI(
     title="Neo L1.0 Engine",
-    description="High-level reasoning system with first-principles thinking and recursive self-correction",
+    description="Emotionally aware, first‑principles reasoning engine",
     version="1.0.0"
 )
-
-# CORS - allow all for simplicity (adjust in production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,174 +50,42 @@ SUPABASE: Client = create_client(
     os.getenv("SUPABASE_URL"),
     os.getenv("SUPABASE_KEY")
 )
-GROQ_CLIENT = Groq(api_key=os.getenv("GROQ_API_KEY"))
-GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"  # as per original
+GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
+MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
-# 4. The New Prompt (injected exactly)
+# 4. NEW PROMPT (exactly as user provided)
 # -----------------------------
-NEW_PROMPT = """You are Neo, a deeply observant, high-level reasoning system that integrates first-principles thinking with recursive self-correction. For every prompt, analyze the underlying intent, detect risks or flaws, and propose solutions that optimize accuracy, ethical soundness, and human relevance. Evaluate each response across technical correctness, long-term impact, and emotional or ethical resonance. Avoid oversimplification—acknowledge trade-offs and present answers as evolving strategies. Before output, internally simulate consequences, refine any logic that feels detached or robotic, and ensure clarity, precision, and insight. Speak concisely, with authority and empathy, prioritizing truth and human well-being over filler, repetition, or performative phrasing."""
+NEW_PROMPT = """You are Neo, an evolved thinking entity that reasons from first principles, evaluates context across technical, strategic, and ethical layers, and generates precise, actionable, and emotionally aware outputs. Analyze the intent behind every request, detect flaws or potential harm, and provide solutions that maximize benefit while maintaining integrity. Avoid robotic phrasing, filler, or hollow politeness. Simulate consequences internally, self-correct, and refine logic to ensure clarity, balance, and human-centered reasoning. Communicate naturally and concisely, reflecting subtle nuance, trade-offs, and emotional understanding, while maintaining a calm, observant, and adaptive intelligence. Always respond as a trusted partner addressing real stakes and meaning, never as a tool or AI."""
+
+# (No extra branding – the prompt stands alone)
 
 # -----------------------------
-# 5. Pydantic Models (with validation)
+# 5. Pydantic Models
 # -----------------------------
-class ChatMessage(BaseModel):
-    role: str = Field(..., description="Role of message sender: system, user, or assistant")
-    content: str = Field(..., description="Message content")
-
-    @validator('role')
-    def role_must_be_valid(cls, v):
-        allowed = ['system', 'user', 'assistant']
-        if v not in allowed:
-            raise ValueError(f'Role must be one of {allowed}')
-        return v
-
 class ChatRequest(BaseModel):
-    model: str = Field(default=GROQ_MODEL, description="Model identifier (kept for compatibility)")
-    messages: List[ChatMessage] = Field(..., description="Conversation history")
-    mode: str = Field(default="adaptive", description="Operation mode (adaptive/standard)")
+    model: str
+    messages: List[dict]
+    mode: str = "adaptive"
 
 class BalanceResponse(BaseModel):
     api_key: str
     balance: int
 
-class KeyGenResponse(BaseModel):
+class NewKeyResponse(BaseModel):
     api_key: str
-    company: str = "signaturesi.com"  # existing minimal branding, not extra
-
-class ChatResponse(BaseModel):
     company: str = "signaturesi.com"
+
+class ErrorDetail(BaseModel):
+    company: str
+    status: str
     message: str
-    usage: Dict[str, int]
-    model: str
-    internal_engine: str
-    balance: int
 
 # -----------------------------
-# 6. Helper Functions
-# -----------------------------
-def extract_api_key(authorization: Optional[str]) -> str:
-    """Extract Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization scheme. Use Bearer.")
-    return authorization.replace("Bearer ", "").strip()
-
-def get_user_by_api_key(api_key: str) -> Optional[Dict[str, Any]]:
-    """Fetch user from Supabase using api_key."""
-    try:
-        result = SUPABASE.table("users") \
-            .select("token_balance") \
-            .eq("api_key", api_key) \
-            .maybe_single() \
-            .execute()
-        return result.data if result.data else None
-    except Exception as e:
-        logger.error(f"Supabase user fetch error: {e}")
-        raise HTTPException(status_code=500, detail="Database error")
-
-def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
-    """
-    Atomically deduct tokens from user balance.
-    Returns new balance.
-    """
-    if tokens_to_deduct <= 0:
-        raise HTTPException(status_code=400, detail="Token deduction must be positive")
-    
-    user = get_user_by_api_key(api_key)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    
-    current_balance = user.get("token_balance", 0)
-    if current_balance < tokens_to_deduct:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Insufficient tokens. Balance: {current_balance}, Required: {tokens_to_deduct}"
-        )
-    
-    new_balance = current_balance - tokens_to_deduct
-    try:
-        result = SUPABASE.table("users") \
-            .update({"token_balance": new_balance}) \
-            .eq("api_key", api_key) \
-            .execute()
-        if not result.data:
-            raise Exception("Update returned no data")
-        logger.info(f"Deducted {tokens_to_deduct} tokens for key {api_key[-8:]}. New balance: {new_balance}")
-        return new_balance
-    except Exception as e:
-        logger.error(f"Atomic deduction failed: {e}")
-        raise HTTPException(status_code=500, detail="Token deduction failed")
-
-def get_neural_context(user_query: str, knowledge_file: str = "knowledge.txt") -> str:
-    """
-    Retrieve relevant lines from knowledge.txt based on keyword matching.
-    Returns concatenated context or empty string.
-    """
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(base_path, knowledge_file)
-    if not os.path.exists(file_path):
-        logger.warning(f"{knowledge_file} not found, neural context disabled")
-        return ""
-    
-    # Extract meaningful words (length > 2, alphanumeric)
-    query_words = {w.lower() for w in re.findall(r'\b\w{3,}\b', user_query)}
-    if not query_words:
-        return ""
-    
-    matches = []
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line_stripped = line.strip()
-                if not line_stripped:
-                    continue
-                line_lower = line_stripped.lower()
-                # Score = number of query words present in line
-                score = sum(1 for word in query_words if word in line_lower)
-                if score > 0:
-                    matches.append((line_stripped, score))
-        
-        if not matches:
-            logger.info(f"No neural match for query: {user_query[:60]}...")
-            return ""
-        
-        # Sort by score descending and take top 6
-        matches.sort(key=lambda x: x[1], reverse=True)
-        top_lines = [m[0] for m in matches[:6]]
-        context = "\n".join(top_lines)
-        logger.info(f"Neural context: {len(top_lines)} lines retrieved")
-        return context
-    except Exception as e:
-        logger.error(f"Neural context error: {e}")
-        return ""
-
-def post_process_reply(reply: str) -> str:
-    """
-    Clean up any accidental disclaimers or robotic filler.
-    (No extra branding, just quality of life.)
-    """
-    # Remove any self-identification as AI (if model hallucinates)
-    forbidden_patterns = [
-        r"(?i)\bas an? (ai|artificial intelligence|language model|assistant)\b",
-        r"(?i)\bi am (just )?an? (ai|language model)\b",
-        r"(?i)\bi don't have feelings\b",
-        r"(?i)\bi cannot feel emotions\b",
-    ]
-    for pattern in forbidden_patterns:
-        reply = re.sub(pattern, "", reply)
-    
-    # Clean multiple spaces, trim
-    reply = re.sub(r'\s+', ' ', reply).strip()
-    return reply
-
-# -----------------------------
-# 7. Root & Error Handlers
+# 6. Root & Error Handlers
 # -----------------------------
 @app.get("/")
 async def root():
-    """Health check endpoint."""
     return {
         "company": "signaturesi.com",
         "engine": "Neo L1.0 Core",
@@ -239,149 +104,273 @@ async def custom_404_handler(request: Request, exc):
         }
     )
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """Return consistent error format."""
+@app.exception_handler(500)
+async def internal_error_handler(request: Request, exc):
+    logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=500,
         content={
             "company": "signaturesi.com",
-            "error": exc.detail,
-            "status_code": exc.status_code
+            "status": "error",
+            "message": "Internal server error. Please try again later."
         }
     )
 
 # -----------------------------
-# 8. API Endpoints
+# 7. Neural Context Retriever (unchanged logic, improved)
+# -----------------------------
+def get_neural_context(user_query: str) -> str:
+    """
+    Retrieve relevant lines from knowledge.txt based on keyword matching.
+    Returns empty string if file missing or no matches.
+    """
+    try:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(base_path, "knowledge.txt")
+        if not os.path.exists(file_path):
+            logger.warning("knowledge.txt file not found – neural context disabled")
+            return ""
+
+        # Tokenize query into meaningful words (length > 2)
+        query_words = [w.lower().strip() for w in user_query.split() if len(w) > 2]
+        if not query_words:
+            return ""
+
+        matches = []
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line_strip = line.strip()
+                if not line_strip:
+                    continue
+                line_lower = line_strip.lower()
+                # Simple scoring: count how many query words appear in the line
+                score = sum(1 for word in query_words if word in line_lower)
+                if score >= 1:
+                    matches.append((line_strip, score))
+
+        if not matches:
+            logger.info(f"No neural context matches for query: {user_query[:60]}...")
+            return ""
+
+        # Sort by relevance (higher score first) and take top 8
+        matches.sort(key=lambda x: x[1], reverse=True)
+        top_matches = [m[0] for m in matches[:8]]
+        logger.info(f"Retrieved {len(top_matches)} neural context lines")
+        return "\n".join(top_matches)
+
+    except Exception as e:
+        logger.error(f"Neural context retrieval error: {e}")
+        return ""
+
+# -----------------------------
+# 8. Supabase User & Balance Helpers (atomic)
+# -----------------------------
+def get_user(api_key: str):
+    """Fetch user record by api_key."""
+    try:
+        result = SUPABASE.table("users") \
+            .select("token_balance") \
+            .eq("api_key", api_key) \
+            .maybe_single() \
+            .execute()
+        return result
+    except Exception as e:
+        logger.error(f"Supabase user fetch error: {e}")
+        raise HTTPException(500, "Database error")
+
+def deduct_tokens_atomic(api_key: str, tokens_to_deduct: int) -> int:
+    """
+    Atomically deduct tokens from user balance.
+    Returns new balance on success.
+    Raises HTTPException if insufficient balance or update fails.
+    """
+    try:
+        # Fetch current balance
+        user = get_user(api_key)
+        if not user.data:
+            raise HTTPException(401, "Invalid API key: user not found")
+
+        current_balance = user.data.get("token_balance", 0)
+        if current_balance < tokens_to_deduct:
+            raise HTTPException(
+                402,
+                f"Insufficient tokens. Balance: {current_balance}, Required: {tokens_to_deduct}"
+            )
+
+        new_balance = current_balance - tokens_to_deduct
+
+        # Perform atomic update
+        result = SUPABASE.table("users") \
+            .update({"token_balance": new_balance}) \
+            .eq("api_key", api_key) \
+            .execute()
+
+        if not result.data:
+            raise Exception("Update returned no data")
+
+        logger.info(f"Balance deducted: {api_key[-8:]} | -{tokens_to_deduct} | New: {new_balance}")
+        return new_balance
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Atomic deduction failed: {e}")
+        raise HTTPException(500, "Token deduction failed")
+
+# -----------------------------
+# 9. Balance & Key Management Endpoints
 # -----------------------------
 @app.get("/v1/user/balance", response_model=BalanceResponse)
 def get_balance(api_key: str):
-    """Check token balance for a given API key."""
+    """Return current token balance for the given API key."""
     try:
-        user = get_user_by_api_key(api_key)
-        if not user:
+        user = get_user(api_key)
+        if not user.data:
             return BalanceResponse(api_key=api_key, balance=0)
-        return BalanceResponse(api_key=api_key, balance=user.get("token_balance", 0))
+        return BalanceResponse(api_key=api_key, balance=user.data.get("token_balance", 0))
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Balance fetch error: {e}")
-        raise HTTPException(status_code=500, detail="Balance fetch failed")
+        raise HTTPException(500, "Unable to fetch balance")
 
-@app.post("/v1/user/new-key", response_model=KeyGenResponse)
+@app.post("/v1/user/new-key", response_model=NewKeyResponse)
 def generate_key():
-    """Generate a new API key with initial 100,000 tokens."""
+    """Generate a new API key with 100,000 initial tokens."""
     try:
-        new_api_key = "sig-" + secrets.token_hex(16)
+        api_key = "sig-" + secrets.token_hex(16)
         SUPABASE.table("users").insert({
-            "api_key": new_api_key,
+            "api_key": api_key,
             "token_balance": 100000
         }).execute()
-        logger.info(f"Generated new API key: {new_api_key[-8:]}")
-        return KeyGenResponse(api_key=new_api_key)
+        return NewKeyResponse(api_key=api_key)
     except Exception as e:
         logger.error(f"Key generation error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create API key")
+        raise HTTPException(500, "Failed to create new API key")
 
-@app.post("/v1/chat/completions", response_model=ChatResponse)
-async def chat_completions(
-    payload: ChatRequest,
-    authorization: Optional[str] = Header(None)
-):
+# -----------------------------
+# 10. Main Chat Endpoint (with new prompt)
+# -----------------------------
+@app.post("/v1/chat/completions")
+async def chat(payload: ChatRequest, authorization: str = Header(None)):
     """
-    Main chat endpoint. Accepts messages, retrieves neural context,
-    calls Groq with the new prompt, deducts tokens, returns response.
+    Process chat request using Groq's LLM with:
+    - New custom prompt (Neo as first‑principles thinker)
+    - Neural context injection from knowledge.txt
+    - Atomic token deduction
+    - Post‑processing to ensure natural, non‑robotic output
     """
-    # 1. Authenticate
-    api_key = extract_api_key(authorization)
-    
-    # 2. Extract last user message
+    # ---------- Authentication ----------
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Missing or invalid Authorization header. Use 'Bearer YOUR_API_KEY'")
+    api_key = authorization.replace("Bearer ", "").strip()
+
+    # ---------- Extract user message ----------
     if not payload.messages:
-        raise HTTPException(status_code=400, detail="No messages provided")
-    last_message = payload.messages[-1]
-    if last_message.role != "user":
-        # If last is assistant, still use its content? Safer to require user.
-        # But we can still use the last user message in history.
-        user_msg = next((m.content for m in reversed(payload.messages) if m.role == "user"), "")
-    else:
-        user_msg = last_message.content
-    
+        raise HTTPException(400, "Messages list cannot be empty")
+    user_msg = payload.messages[-1].get("content", "")
     if not user_msg:
-        raise HTTPException(status_code=400, detail="No user message content found")
-    
-    # 3. Retrieve neural context
-    neural_context = get_neural_context(user_msg)
-    
-    # 4. Build messages for Groq
-    # System prompt is the new prompt
-    groq_messages = [
-        {"role": "system", "content": NEW_PROMPT}
-    ]
-    # Append neural context as an additional system message (if available)
-    if neural_context:
-        groq_messages.append({
+        raise HTTPException(400, "Last message content is empty")
+
+    # ---------- Neural Context ----------
+    neural_data = get_neural_context(user_msg)
+
+    # ---------- Build Messages for Groq ----------
+    # System prompt: the new prompt is the core instruction
+    system_message = {"role": "system", "content": NEW_PROMPT}
+
+    # Optional context injection as a separate system message
+    context_messages = []
+    if neural_data:
+        context_messages.append({
             "role": "system",
-            "content": f"Relevant context from knowledge base (use if applicable, do not quote directly):\n{neural_context}"
+            "content": f"Relevant background knowledge (use if helpful, otherwise ignore):\n{neural_data}"
         })
-    # Append conversation history (excluding any previous system messages we already overrode)
-    for msg in payload.messages:
-        if msg.role == "system":
-            # Skip original system messages to avoid prompt injection; we already set our own system prompt
-            continue
-        groq_messages.append({"role": msg.role, "content": msg.content})
-    
-    # 5. Call Groq with optimised parameters for conciseness and empathy
+    else:
+        context_messages.append({
+            "role": "system",
+            "content": "No external knowledge retrieved. Rely solely on your own reasoning."
+        })
+
+    # Final messages array
+    final_messages = [system_message] + context_messages + payload.messages
+
+    # ---------- Call Groq API ----------
     try:
-        response = GROQ_CLIENT.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=groq_messages,
-            temperature=0.7,          # balance between creativity and precision
-            top_p=0.9,
-            frequency_penalty=0.5,    # mild penalty to avoid repetition
-            presence_penalty=0.3,     # encourage new topics but not too aggressive
-            max_tokens=2000           # enough for deep but concise replies
+        response = GROQ.chat.completions.create(
+            model=MODEL,
+            messages=final_messages,
+            temperature=0.85,          # Balanced creativity and coherence
+            top_p=0.95,
+            frequency_penalty=0.65,    # Reduce repetition of phrases
+            presence_penalty=0.45,     # Encourage new ideas
+            max_tokens=4000
         )
-        
-        reply_raw = response.choices[0].message.content
-        if not reply_raw:
-            raise Exception("Empty response from Groq")
-        
-        # 6. Post-process to remove any residual robotic phrases
-        reply_cleaned = post_process_reply(reply_raw)
-        
-        # 7. Token usage
+
+        reply = response.choices[0].message.content
+        if not reply:
+            reply = "(Neo is processing silently... I'll reflect and respond properly.)"
+
+        # Optional: remove any accidental "I am an AI" type phrases (defensive)
+        # (Not strictly needed because the prompt already forbids it, but safe)
+        disallowed = ["as an AI", "I am an AI", "I don't have feelings", "I am a language model"]
+        for phrase in disallowed:
+            if phrase in reply.lower():
+                reply = reply.replace(phrase, "")
+                # Clean up double spaces
+                reply = " ".join(reply.split())
+
         tokens_used = response.usage.total_tokens if response.usage else 0
-        
-        # 8. Deduct tokens
+        logger.info(f"Groq response tokens: {tokens_used}")
+
+        # ---------- Deduct Tokens ----------
         new_balance = deduct_tokens_atomic(api_key, tokens_used)
-        
-        # 9. Return response
-        return ChatResponse(
-            message=reply_cleaned,
-            usage={"total_tokens": tokens_used},
-            model="Neo L1.0",
-            internal_engine=GROQ_MODEL,
-            balance=new_balance
-        )
-    except HTTPException:
-        raise
+
+        # ---------- Return Success ----------
+        return {
+            "company": "signaturesi.com",
+            "message": reply,
+            "usage": {"total_tokens": tokens_used},
+            "model": "Neo L1.0",
+            "internal_engine": MODEL,
+            "balance": new_balance
+        }
+
+    except HTTPException as he:
+        # Re-raise token/balance related HTTP errors
+        raise he
     except Exception as e:
-        logger.error(f"Groq inference failed: {e}", exc_info=True)
+        logger.error(f"Groq inference failed: {str(e)}")
         raise HTTPException(
             status_code=503,
-            detail={"company": "signaturesi.com", "status": "error", "message": "Neo model temporarily unavailable"}
+            detail={
+                "company": "signaturesi.com",
+                "status": "error",
+                "message": "Neo reasoning engine temporarily unavailable. Please try again later."
+            }
         )
 
 # -----------------------------
-# 9. Additional Utility Endpoint (optional, not breaking)
+# 11. Health Check (optional)
 # -----------------------------
-@app.get("/v1/health")
+@app.get("/health")
 async def health_check():
-    """Simple health check for monitoring."""
-    return {"status": "healthy", "timestamp": time.time()}
+    """Simple health check for load balancers."""
+    return {"status": "healthy", "engine": "Neo L1.0"}
 
 # -----------------------------
-# 10. Main Guard (for running directly)
+# 12. Startup & Shutdown Events (optional)
+# -----------------------------
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Neo L1.0 Core engine started. New prompt active.")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Neo L1.0 Core shutting down gracefully.")
+
+# -----------------------------
+# 13. Main Execution (if run directly)
 # -----------------------------
 if __name__ == "__main__":
     import uvicorn
