@@ -4,9 +4,11 @@ import secrets
 import re
 import requests
 from typing import List, Optional, Dict
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from supabase import create_client, Client
 from dotenv import load_dotenv
 from groq import Groq
 import difflib
@@ -16,11 +18,14 @@ import difflib
 # -----------------------------
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Neo-L1.0")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+logger = logging.getLogger("Neo-Pro")
 
-required_vars = ["GROQ_API_KEY"]
-missing = [v for v in required_vars if not os.getenv(v)]
+REQUIRED = ["SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY"]
+missing = [v for v in REQUIRED if not os.getenv(v)]
 if missing:
     raise RuntimeError(f"Missing ENV: {missing}")
 
@@ -36,46 +41,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+SUPABASE: Client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
+
 GROQ = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # -----------------------------
 # 3. STRONG SYSTEM PROMPT
 # -----------------------------
-SYSTEM_PROMPT = """
+BASE_PROMPT = """
 You are Neo L1.0.
 
 STRICT RULES:
-- You MUST use the provided knowledge (Local Knowledge + Wikipedia).
-- DO NOT rely on your own memory.
-- DO NOT say "knowledge cutoff".
-- If external knowledge is provided, base your answer ONLY on that.
-- Be natural, clear, and confident.
+- ALWAYS use provided context (Local Knowledge + Wikipedia)
+- NEVER say "knowledge cutoff"
+- NEVER rely on your own hidden knowledge
+- If context exists → it is the truth
+- Answer naturally like a human
+
+Stay precise, clear, and confident.
 """
 
 # -----------------------------
-# 4. REQUEST MODEL
+# 4. REQUEST MODELS
 # -----------------------------
 class ChatMessage(BaseModel):
     role: str
     content: str
 
 class ChatRequest(BaseModel):
+    model: str
     messages: List[ChatMessage]
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 2000
 
 # -----------------------------
-# 5. QUERY CLEANING
-# -----------------------------
-def clean_query(text: str) -> str:
-    words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
-    return " ".join(words[:3])  # top 3 keywords
-
-# -----------------------------
-# 6. WIKIPEDIA ENGINE
+# 5. WIKIPEDIA ENGINE
 # -----------------------------
 WIKI_CACHE: Dict[str, str] = {}
+
+def clean_query(q: str) -> str:
+    q = re.sub(r"[^a-zA-Z0-9\s]", "", q)
+    return " ".join(q.split()[:3])
 
 def fetch_wikipedia(query: str) -> str:
     try:
@@ -86,7 +96,7 @@ def fetch_wikipedia(query: str) -> str:
             return res.json().get("extract", "")
 
         # fallback search
-        search_url = "https://en.wikipedia.org/w/api.php"
+        search_api = "https://en.wikipedia.org/w/api.php"
         params = {
             "action": "query",
             "list": "search",
@@ -94,19 +104,19 @@ def fetch_wikipedia(query: str) -> str:
             "format": "json"
         }
 
-        r = requests.get(search_url, params=params)
+        r = requests.get(search_api, params=params, timeout=3)
         data = r.json()
 
-        if data["query"]["search"]:
+        if data.get("query", {}).get("search"):
             title = data["query"]["search"][0]["title"]
             return fetch_wikipedia(title)
 
         return ""
     except Exception as e:
-        logger.error(f"Wikipedia error: {e}")
+        logger.error(f"WIKI ERROR: {e}")
         return ""
 
-def filter_sentences(text: str, query: str) -> str:
+def smart_filter(text: str, query: str) -> str:
     sentences = text.split(". ")
     q_words = set(query.lower().split())
 
@@ -124,13 +134,14 @@ def get_wiki_context(query: str) -> str:
         return WIKI_CACHE[query]
 
     raw = fetch_wikipedia(query)
-    filtered = filter_sentences(raw, query)
+    filtered = smart_filter(raw, query)
 
     WIKI_CACHE[query] = filtered
+    logger.info(f"WIKI USED: {query}")
     return filtered
 
 # -----------------------------
-# 7. LOCAL RAG ENGINE
+# 6. LOCAL RAG ENGINE
 # -----------------------------
 class ContextEngine:
     knowledge: List[str] = []
@@ -140,21 +151,22 @@ class ContextEngine:
     def load(cls):
         if cls.loaded:
             return
-        path = os.path.join(os.getcwd(), "knowledge.txt")
-
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                cls.knowledge = [l.strip() for l in f if len(l.strip()) > 20]
-
-        cls.loaded = True
-        logger.info(f"Loaded {len(cls.knowledge)} knowledge lines")
+        try:
+            path = os.path.join(os.getcwd(), "knowledge.txt")
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    cls.knowledge = [l.strip() for l in f if len(l.strip()) > 20]
+            logger.info(f"Knowledge loaded: {len(cls.knowledge)} lines")
+            cls.loaded = True
+        except Exception as e:
+            logger.error(f"LOAD ERROR: {e}")
 
     @classmethod
-    def score(cls, q: str, line: str):
+    def score(cls, q, line):
         return difflib.SequenceMatcher(None, q.lower(), line.lower()).ratio()
 
     @classmethod
-    def search(cls, query: str):
+    def get(cls, query: str):
         cls.load()
 
         scored = [(cls.score(query, l), l) for l in cls.knowledge]
@@ -168,38 +180,43 @@ class ContextEngine:
         }
 
 # -----------------------------
+# 7. RESPONSE CLEANER
+# -----------------------------
+def clean_response(text: str) -> str:
+    forbidden = ["knowledge cutoff", "as an ai", "language model"]
+    for f in forbidden:
+        text = re.sub(f, "", text, flags=re.IGNORECASE)
+    return text.strip()
+
+# -----------------------------
 # 8. CHAT ENDPOINT
 # -----------------------------
-@app.post("/chat")
+@app.post("/v1/chat/completions")
 async def chat(payload: ChatRequest, authorization: str = Header(None)):
+
     if not authorization:
         raise HTTPException(401, "Missing API key")
 
     user_msg = payload.messages[-1].content
 
-    # 1. LOCAL SEARCH
-    ctx = ContextEngine.search(user_msg)
+    # LOCAL RAG
+    ctx = ContextEngine.get(user_msg)
 
-    # 2. WIKI FALLBACK
+    # WIKI RAG
     wiki = ""
     if ctx["matches"] < 2:
-        clean = clean_query(user_msg)
-        wiki = get_wiki_context(clean)
+        q = clean_query(user_msg)
+        wiki = get_wiki_context(q)
 
-    # DEBUG
-    print("LOCAL:", ctx["matches"])
-    print("WIKI:", wiki[:200])
-
-    # 3. BUILD PROMPT
-    sys_prompt = SYSTEM_PROMPT
+    # BUILD PROMPT
+    sys_prompt = BASE_PROMPT
 
     if ctx["context"]:
-        sys_prompt += "\n\n### LOCAL KNOWLEDGE:\n" + ctx["context"]
+        sys_prompt += f"\n\n### LOCAL KNOWLEDGE:\n{ctx['context']}"
 
     if wiki:
-        sys_prompt += "\n\n### VERIFIED WIKIPEDIA DATA:\n" + wiki + "\nUse this strictly."
+        sys_prompt += f"\n\n### VERIFIED WIKIPEDIA DATA:\n{wiki}"
 
-    # 4. SEND TO MODEL
     messages = [{"role": "system", "content": sys_prompt}]
     messages += [{"role": m.role, "content": m.content} for m in payload.messages]
 
@@ -211,15 +228,18 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
             max_tokens=payload.max_tokens
         )
 
+        reply = clean_response(res.choices[0].message.content)
+
         return {
-            "response": res.choices[0].message.content,
+            "message": reply,
             "wiki_used": bool(wiki),
-            "local_matches": ctx["matches"]
+            "local_matches": ctx["matches"],
+            "tokens": res.usage.total_tokens
         }
 
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(500, "Model error")
+        logger.error(f"MODEL ERROR: {e}")
+        raise HTTPException(500, "Model failed")
 
 # -----------------------------
 # 9. STARTUP
@@ -227,10 +247,11 @@ async def chat(payload: ChatRequest, authorization: str = Header(None)):
 @app.on_event("startup")
 async def startup():
     ContextEngine.load()
+    logger.info("System Ready")
 
 # -----------------------------
 # 10. RUN
 # -----------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
