@@ -3,4 +3,6 @@ uvicorn
 python-dotenv
 supabase
 groq
+wikipedia
+cachetools
 pydantic
